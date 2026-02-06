@@ -1,6 +1,6 @@
 import { io } from "socket.io-client"
 
-const SOCKET_URL = import.meta.env.VITE_API_URL || "http://localhost:5000"
+const SOCKET_URL = import.meta.env.VITE_API_URL || "https://chat-server-5h9u.onrender.com"
 
 let socket = null
 let currentUserId = null
@@ -25,6 +25,11 @@ export const initializeSocket = (userId) => {
 
   socket = io(SOCKET_URL, {
     autoConnect: false,
+    transports: ["websocket", "polling"], // Add this for better compatibility
+    withCredentials: true, // Add this for cookies/auth
+    reconnection: true,
+    reconnectionAttempts: 5,
+    reconnectionDelay: 1000,
   })
 
   socket.connect()
