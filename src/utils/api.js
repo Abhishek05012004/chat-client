@@ -1,12 +1,14 @@
 import axios from "axios"
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000"
+// Use your Render server URL directly
+const API_URL = "https://chat-server-5h9u.onrender.com"
 
 const api = axios.create({
   baseURL: API_URL,
   headers: {
     "Content-Type": "application/json",
   },
+  withCredentials: true, // Add this for cookies
 })
 
 // Add token to requests (sessionStorage - cleared when tab/browser closes)
