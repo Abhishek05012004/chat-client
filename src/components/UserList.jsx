@@ -67,16 +67,33 @@ export default function UserList({ selectedChat, onSelectChat, socket, onOpenPro
         })
       })
 
+      // Refresh data on message events to keep unread counts and last messages in sync
+      const handleRefresh = () => {
+        // Simple debounce could be added here if needed, but for now direct fetch is reliable
+        fetchData() 
+      }
+
+      socket.on("receive-message", handleRefresh)
+      socket.on("message-seen-update", handleRefresh)
+      socket.on("unread-count-changed", handleRefresh)
+
       return () => {
         socket.off("user-status-changed", handleUserStatusChanged)
         socket.off("user-typing")
         socket.off("user-stop-typing")
+        socket.off("receive-message", handleRefresh)
+        socket.off("message-seen-update", handleRefresh)
+        socket.off("unread-count-changed", handleRefresh)
       }
     }
-  }, [socket])
+  }, [socket, activeTab]) // Added activeTab to dependency to ensure fetchData uses correct tab
 
   const fetchData = async () => {
-    setLoading(true)
+    // Don't show full loading spinner for background updates
+    if (users.length === 0 && chats.length === 0 && friends.length === 0) {
+      setLoading(true)
+    }
+    
     try {
       if (activeTab === "chats") {
         const response = await api.get("/api/chats")
@@ -105,7 +122,8 @@ export default function UserList({ selectedChat, onSelectChat, socket, onOpenPro
       }
     } catch (error) {
       console.error("[v0] Fetch data error:", error)
-      toast.error("Failed to load data")
+      // Only show error toast on initial load failure, not background refresh
+      if (loading) toast.error("Failed to load data")
     } finally {
       setLoading(false)
     }
@@ -227,8 +245,12 @@ export default function UserList({ selectedChat, onSelectChat, socket, onOpenPro
               <div className="space-y-2">
                 {activeTab === "chats" && filteredData.map((chat) => {
                   const otherUser = getOtherParticipant(chat)
-                  const isOnline =
-                    userStatuses[String(otherUser._id)] === "online" || otherUser.status === "online"
+                  // FIXED: Prioritize real-time status from socket
+                  const statusFromSocket = userStatuses[String(otherUser._id)]
+                  const isOnline = statusFromSocket 
+                    ? statusFromSocket === "online" 
+                    : otherUser.status === "online"
+                  
                   const isTyping = typingUsers[chat._id]
                   const unreadCount = chat.unreadCount || 0
                   const lastMessage = chat.lastMessage
@@ -253,7 +275,7 @@ export default function UserList({ selectedChat, onSelectChat, socket, onOpenPro
                                 src={otherUser.profileImage || "/placeholder.svg"}
                                 alt="Profile"
                                 className="w-10 h-10 rounded-full object-cover border border-gray-300"
-                              />
+                                />
                             ) : (
                               <div className="w-10 h-10 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold">
                                 {otherUser.username[0].toUpperCase()}
@@ -306,8 +328,11 @@ export default function UserList({ selectedChat, onSelectChat, socket, onOpenPro
                 })}
 
                 {activeTab === "friends" && filteredData.map((friend) => {
-                  const isOnline =
-                    userStatuses[String(friend._id)] === "online" || friend.status === "online"
+                  // FIXED: Prioritize real-time status from socket
+                  const statusFromSocket = userStatuses[String(friend._id)]
+                  const isOnline = statusFromSocket 
+                    ? statusFromSocket === "online" 
+                    : friend.status === "online"
                   const isLoading = actionLoading[friend._id]
 
                   return (

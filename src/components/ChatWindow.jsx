@@ -794,6 +794,9 @@ export default function ChatWindow({
     setIsCallFullScreen(!isCallFullScreen)
   }
 
+  // Identify the last few messages to open menu upwards
+  const lastMessageIds = new Set(messages.slice(-4).map(m => m._id))
+
   return (
     <div className="flex flex-col h-full bg-white relative">
       {/* Video Call Overlay - Only when in video call mode */}
@@ -873,26 +876,26 @@ export default function ChatWindow({
         </div>
       </div>
 
-      {/* Messages section */}
-      <div className={`flex-1 overflow-y-auto bg-gray-50 p-4 ${isVideoCallMode && !isCallFullScreen ? 'opacity-30 pointer-events-none' : ''}`}>
+      <div className={`flex-1 overflow-y-auto bg-[#e5ddd5] p-4 ${isVideoCallMode && !isCallFullScreen ? 'opacity-30 pointer-events-none' : ''}`}
+           style={{ backgroundImage: "url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png')", backgroundRepeat: 'repeat', backgroundSize: '400px' }}>
         {loading ? (
           <div className="flex items-center justify-center h-full">
-            <div className="text-gray-500">Loading messages...</div>
+            <div className="bg-white/80 backdrop-blur-sm px-4 py-2 rounded-full shadow-sm text-gray-600">Loading messages...</div>
           </div>
         ) : messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center">
-            <div className="w-20 h-20 bg-gray-200 rounded-full flex items-center justify-center mb-4">
-              <FontAwesomeIcon icon={faUser} className="text-3xl text-gray-400" />
+            <div className="w-24 h-24 bg-white/50 backdrop-blur-md rounded-full flex items-center justify-center mb-6 shadow-sm">
+              <FontAwesomeIcon icon={faUser} className="text-4xl text-gray-500" />
             </div>
-            <h3 className="text-gray-800 text-lg font-semibold mb-2">Say hello to {otherUser.username}</h3>
-            <p className="text-gray-600 text-sm">Start a conversation now</p>
+            <h3 className="text-gray-800 text-xl font-bold mb-2">Say hello to {otherUser.username}</h3>
+             <p className="text-gray-600 bg-white/60 px-4 py-1 rounded-full text-sm">Start a conversation now</p>
           </div>
         ) : (
           <>
             {Object.entries(groupedMessages).map(([date, dateMessages]) => (
               <div key={date}>
                 <div className="flex items-center justify-center my-6">
-                  <div className="bg-gray-200 text-gray-600 text-xs px-3 py-1.5 rounded-full">
+                  <div className="bg-white/90 backdrop-blur-sm shadow-sm text-gray-600 text-xs font-medium px-4 py-1.5 rounded-full uppercase tracking-wide">
                     {date}
                   </div>
                 </div>
@@ -902,10 +905,13 @@ export default function ChatWindow({
                   const isSystem = message.isSystem
                   const isCallMessage = message.type === "call"
                   const messageStatus = !isCallMessage ? getMessageStatus(message) : null
+                  // Show menu below for all messages except the last few to avoid clipping
+                  const showMenuBelow = !lastMessageIds.has(message._id)
 
                   return isSystem ? (
-                    <div key={message._id} className="flex justify-center my-2">
-                      <div className="bg-gray-200 text-gray-600 text-xs px-3 py-1.5 rounded-full">
+                    <div key={message._id} className="flex justify-center my-3">
+                      <div className="bg-blue-50 text-blue-800 text-xs px-4 py-2 rounded-full shadow-sm flex items-center gap-2">
+                        <FontAwesomeIcon icon={faInfoCircle} className="text-blue-500" />
                         {message.content}
                       </div>
                     </div>
@@ -913,42 +919,43 @@ export default function ChatWindow({
                     <div
                       key={message._id}
                       ref={(el) => (messageRefs.current[message._id] = el)}
-                      className={`flex mb-1 ${isOwn ? "justify-end" : "justify-start"}`}
+                      className={`flex mb-3 ${isOwn ? "justify-end" : "justify-start"} group relative`}
+                      style={{ zIndex: showDeleteMenu === message._id ? 50 : 'auto' }}
+                      onMouseLeave={() => setShowDeleteMenu(null)}
                     >
-                      <div className={`max-w-[65%] md:max-w-[50%]`}>
-                        <div className="relative group">
+                      <div className={`max-w-[70%] md:max-w-[60%]`}>
+                        <div className="relative">
                           {/* Message bubble */}
                           <div
-                            className={`rounded-lg px-3 py-1.5 ${isOwn
-                              ? "bg-blue-500 text-white rounded-tr-none"
-                              : "bg-white text-gray-800 border border-gray-200 rounded-tl-none"
+                            className={`rounded-2xl px-4 py-2 shadow-sm ${isOwn
+                              ? "bg-[#d9fdd3] text-gray-800 rounded-tr-none"
+                              : "bg-white text-gray-800 rounded-tl-none"
                             }`}
                           >
                             {isCallMessage ? (
-                              <div className="flex items-center gap-2 py-0.5">
-                                <FontAwesomeIcon icon={faVideo} className="text-sm opacity-90 shrink-0" />
-                                <p className="text-sm break-words whitespace-pre-wrap flex-1">
-                                  {message.content}
-                                </p>
-                                <p className="text-[10px] opacity-70 whitespace-nowrap shrink-0">
-                                  {new Date(message.createdAt).toLocaleTimeString([], {
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                  })}
-                                </p>
+                              <div className="flex items-center gap-3 py-1">
+                                <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
+                                  <FontAwesomeIcon icon={faVideo} className="text-gray-600 text-lg" />
+                                </div>
+                                <div className="flex-1">
+                                    <p className="font-semibold text-sm text-gray-800">Video Call</p>
+                                    <p className="text-xs text-gray-500 text-sm break-words whitespace-pre-wrap flex-1">
+                                      {message.content}
+                                    </p>
+                                </div>
                               </div>
                             ) : message.content && (
-                              <div className="flex items-end">
-                                <p className="text-sm break-words whitespace-pre-wrap flex-1 pr-10">
+                              <div className="flex flex-col relative min-w-[80px]">
+                                <p className="text-sm leading-relaxed break-words whitespace-pre-wrap pr-2 pb-1">
                                   {message.content}
                                 </p>
-                                <div className="flex items-center gap-1 shrink-0 pl-1 self-end">
-                                  <p className="text-[10px] opacity-70 whitespace-nowrap">
+                                <div className="flex items-center justify-end gap-1.5 self-end -mt-1 ml-4 select-none">
+                                  <span className="text-[10px] text-gray-500 min-w-fit">
                                     {new Date(message.createdAt).toLocaleTimeString([], {
                                       hour: "2-digit",
                                       minute: "2-digit",
                                     })}
-                                  </p>
+                                  </span>
                                   {messageStatus && (
                                     <FontAwesomeIcon 
                                       icon={messageStatus.icon} 
@@ -961,7 +968,7 @@ export default function ChatWindow({
                             )}
 
                             {message.attachments && message.attachments.length > 0 && (
-                              <div className="mt-1">
+                              <div className="mt-2 space-y-2">
                                 {message.attachments.map((attachment, idx) => {
                                   const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000"
                                   const downloadUrl = `${API_URL}${attachment.fileUrl}`
@@ -971,85 +978,89 @@ export default function ChatWindow({
                                       key={idx}
                                       href={downloadUrl}
                                       download={attachment.fileName}
-                                      className="flex items-center gap-3 bg-gray-100 hover:bg-gray-200 p-2 rounded-lg mb-1 transition-colors cursor-pointer border border-gray-300"
+                                      className="flex items-center gap-3 bg-black/5 hover:bg-black/10 p-3 rounded-xl transition-all cursor-pointer border border-transparent hover:border-black/5"
                                       target="_blank"
                                       rel="noreferrer"
                                     >
-                                      <FontAwesomeIcon 
-                                        icon={getFileIcon(attachment.fileType)} 
-                                        className={`text-lg ${getFileIconColor(attachment.fileType)}`}
-                                      />
+                                      <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-sm text-xl">
+                                        <FontAwesomeIcon 
+                                          icon={getFileIcon(attachment.fileType)} 
+                                          className={`${getFileIconColor(attachment.fileType)}`}
+                                        />
+                                      </div>
                                       <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-medium text-gray-800 truncate">
+                                        <p className="text-sm font-semibold text-gray-800 truncate">
                                           {attachment.fileName}
                                         </p>
-                                        <p className="text-xs text-gray-600">
-                                          {(attachment.fileSize / (1024 * 1024)).toFixed(2)} MB
+                                        <p className="text-[10px] text-gray-500 uppercase font-medium tracking-wide">
+                                          {(attachment.fileSize / (1024 * 1024)).toFixed(2)} MB • {attachment.fileType.split('/')[1] || 'FILE'}
                                         </p>
                                       </div>
-                                      <FontAwesomeIcon 
-                                        icon={faDownload} 
-                                        className="text-gray-500 text-xs"
-                                      />
+                                      <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center shadow-sm text-gray-500">
+                                        <FontAwesomeIcon icon={faDownload} className="text-xs" />
+                                      </div>
                                     </a>
                                   )
                                 })}
-                                {/* Time and status for attachment messages */}
-                                <div className="flex justify-end items-center gap-1 mt-0.5">
-                                  <p className="text-[10px] opacity-70">
-                                    {new Date(message.createdAt).toLocaleTimeString([], {
-                                      hour: "2-digit",
-                                      minute: "2-digit",
-                                    })}
-                                  </p>
-                                  {/* Only show status for my own messages */}
-                                  {messageStatus && (
-                                    <FontAwesomeIcon 
-                                      icon={messageStatus.icon} 
-                                      className={`text-[10px] ${messageStatus.color}`}
-                                      title={messageStatus.label}
-                                    />
-                                  )}
-                                </div>
+                                {/* Time check for attachments only if no text content */}
+                                {!message.content && (
+                                    <div className="flex justify-end items-center gap-1 mt-1">
+                                      <span className="text-[10px] text-gray-500">
+                                        {new Date(message.createdAt).toLocaleTimeString([], {
+                                          hour: "2-digit",
+                                          minute: "2-digit",
+                                        })}
+                                      </span>
+                                      {messageStatus && (
+                                        <FontAwesomeIcon 
+                                          icon={messageStatus.icon} 
+                                          className={`text-[10px] ${messageStatus.color}`}
+                                          title={messageStatus.label}
+                                        />
+                                      )}
+                                    </div>
+                                )}
                               </div>
                             )}
                           </div>
 
-                          {/* Reactions - not for call messages */}
+                          {/* Reactions */}
                           {!isCallMessage && message.reactions && message.reactions.length > 0 && (
-                            <div className={`flex gap-1 mt-0.5 flex-wrap ${isOwn ? "justify-end" : "justify-start"}`}>
-                              {Array.from(
-                                message.reactions.reduce((acc, r) => {
-                                  acc.set(r.emoji, (acc.get(r.emoji) || 0) + 1)
-                                  return acc
-                                }, new Map()),
-                              ).map(([emoji, count]) => (
-                                <button
-                                  key={emoji}
-                                  onClick={() => handleReaction(message._id, emoji)}
-                                  className="bg-gray-200 hover:bg-gray-300 rounded-full px-1.5 py-0.5 text-xs flex items-center gap-0.5"
-                                >
-                                  <span className="text-xs">{emoji}</span>
-                                  <span className="text-[9px] text-gray-600">{count}</span>
-                                </button>
-                              ))}
+                            <div className={`absolute -bottom-3 ${isOwn ? 'right-0' : 'left-0'} z-10`}>
+                                <div className="bg-white rounded-full shadow pl-1 pr-2 py-0.5 flex items-center gap-1 border border-gray-100">
+                                  {Array.from(
+                                    message.reactions.reduce((acc, r) => {
+                                      acc.set(r.emoji, (acc.get(r.emoji) || 0) + 1)
+                                      return acc
+                                    }, new Map()),
+                                  ).map(([emoji, count]) => (
+                                    <button
+                                      key={emoji}
+                                      onClick={() => handleReaction(message._id, emoji)}
+                                      className="flex items-center hover:bg-gray-100 rounded-full px-1 transition-colors"
+                                    >
+                                      <span className="text-sm">{emoji}</span>
+                                      {count > 1 && <span className="text-[10px] text-gray-500 font-medium ml-0.5">{count}</span>}
+                                    </button>
+                                  ))}
+                                </div>
                             </div>
                           )}
 
-                          {/* Message actions - not for call messages (WhatsApp-style) */}
+                          {/* Message actions (Menu) */}
                           {!isCallMessage && (
                           <div
-                            className={`absolute top-1/2 -translate-y-1/2 ${isOwn 
-                              ? "left-0 -translate-x-full mr-1" 
-                              : "right-0 translate-x-full ml-1"} opacity-0 group-hover:opacity-100 transition-opacity`}
+                            className={`absolute top-0 ${isOwn 
+                              ? "left-0 -translate-x-full pr-2" 
+                              : "right-0 translate-x-full pl-2"} opacity-0 group-hover:opacity-100 transition-opacity flex items-center h-full`}
                           >
-                            <div className="bg-white border border-gray-300 rounded-md shadow-sm flex items-center p-0.5">
+                            <div className="bg-white/90 backdrop-blur-sm border border-gray-100 rounded-lg shadow-sm flex items-center p-0.5 gap-0.5">
                               <button
                                 onClick={(e) => handleToggleReactionPicker(message._id, e)}
-                                className="p-1 hover:bg-gray-100 rounded-sm transition-colors"
-                                title="Add reaction"
+                                className="p-1 hover:bg-gray-100 rounded transition-colors text-gray-500 hover:text-yellow-500"
+                                title="React"
                               >
-                                <FontAwesomeIcon icon={faSmile} className="text-gray-600 text-xs" />
+                                <FontAwesomeIcon icon={faSmile} className="text-xs" />
                               </button>
 
                               <div ref={deleteMenuRef} className="relative">
@@ -1058,29 +1069,29 @@ export default function ChatWindow({
                                     e.stopPropagation()
                                     setShowDeleteMenu(showDeleteMenu === message._id ? null : message._id)
                                   }}
-                                  className="p-1 hover:bg-gray-100 rounded-sm transition-colors"
-                                  title="Delete message"
+                                  className="p-1 hover:bg-gray-100 rounded transition-colors text-gray-500 hover:text-red-500"
+                                  title="Delete"
                                 >
-                                  <FontAwesomeIcon icon={faTrash} className="text-gray-600 text-xs" />
+                                  <FontAwesomeIcon icon={faTrash} className="text-xs" />
                                 </button>
 
                                 {showDeleteMenu === message._id && (
                                   <div
-                                    className={`absolute bottom-full ${isOwn ? "right-0" : "left-0"} mb-0.5 bg-white border border-gray-300 rounded-md shadow-lg z-20 min-w-max`}
+                                    className={`absolute ${showMenuBelow ? 'top-full mt-1' : 'bottom-full mb-1'} ${isOwn ? 'right-0 origin-top-right' : 'left-0 origin-top-left'} bg-white border border-gray-100 rounded-lg shadow-xl z-50 w-48 overflow-hidden py-1 ring-1 ring-black/5`}
                                   >
                                     <button
                                       onClick={() => handleDeleteMessage(message._id, "me")}
-                                      className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100"
+                                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
                                     >
-                                      <FontAwesomeIcon icon={faTrashAlt} className="text-gray-600 mr-1.5 text-xs" />
+                                      <FontAwesomeIcon icon={faTrashAlt} className="text-gray-400" />
                                       Delete for me
                                     </button>
                                     {isOwn && (
                                       <button
                                         onClick={() => handleDeleteMessage(message._id, "everyone")}
-                                        className="block w-full text-left px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 border-t border-gray-200"
+                                        className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
                                       >
-                                        <FontAwesomeIcon icon={faBan} className="text-red-600 mr-1.5 text-xs" />
+                                        <FontAwesomeIcon icon={faBan} className="text-red-500" />
                                         Delete for everyone
                                       </button>
                                     )}

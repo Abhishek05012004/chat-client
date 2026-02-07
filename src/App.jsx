@@ -43,14 +43,15 @@ export default function App() {
       <BrowserRouter>
         <ToastContainer
           position="top-right"
-          autoClose={3000}
+          autoClose={2000}
+          limit={3}
           hideProgressBar={false}
           newestOnTop={false}
           closeOnClick
           rtl={false}
           pauseOnFocusLoss
           draggable
-          pauseOnHover
+          pauseOnHover={false}
           theme="colored"
         />
         <Routes>

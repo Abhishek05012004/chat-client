@@ -16,10 +16,6 @@ import {
   faComments, 
   faUserFriends, 
   faSignOutAlt, 
-  faBars,
-  faTimes,
-  faChevronLeft,
-  faBell,
   faVideo,
   faPhone,
   faEllipsisV
@@ -35,7 +31,6 @@ export default function ChatApp() {
   const [showMediaGallery, setShowMediaGallery] = useState(false);
   const [globalIncomingCall, setGlobalIncomingCall] = useState(null);
   const [showGlobalCallScreen, setShowGlobalCallScreen] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [unreadRequests, setUnreadRequests] = useState(0);
   const [callTimers, setCallTimers] = useState({});
 
@@ -49,9 +44,10 @@ export default function ChatApp() {
         console.log("User status changed:", data);
       });
 
-      socketInstance.on("friend-request-received", (data) => {
+        socketInstance.on("friend-request-received", (data) => {
         toast.info(`${data.senderUsername} sent you a friend request!`, {
-          autoClose: 5000,
+          toastId: `friend-req-${data.senderId}`,
+          autoClose: 3000,
         });
         setUnreadRequests(prev => prev + 1);
       });
@@ -60,7 +56,8 @@ export default function ChatApp() {
         toast.success(
           `${data.acceptedByUsername} accepted your friend request!`,
           {
-            autoClose: 5000,
+            toastId: `friend-accept-${data.userId}`,
+            autoClose: 3000,
           },
         );
       });
@@ -199,7 +196,6 @@ export default function ChatApp() {
   const handleOpenProfile = (userId, isOwn) => {
     setSelectedUserId(userId);
     setShowProfileModal(true);
-    setIsMobileMenuOpen(false);
   };
 
   const handleGlobalAcceptCall = async () => {
@@ -306,12 +302,10 @@ export default function ChatApp() {
 
   const handleSelectChat = (chat) => {
     setSelectedChat(chat);
-    setIsMobileMenuOpen(false);
   };
 
   const handleBackToChats = () => {
     setSelectedChat(null);
-    setIsMobileMenuOpen(false);
   };
 
   return (
@@ -329,137 +323,77 @@ export default function ChatApp() {
         />
       )}
 
-      {/* Mobile Header - Only shown on mobile when chat is selected */}
-      {selectedChat && (
-        <div className="md:hidden fixed top-0 left-0 right-0 bg-gradient-to-r from-indigo-600 to-purple-600 text-white z-50 p-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <button
-                onClick={handleBackToChats}
-                className="cursor-pointer p-2 hover:bg-white/10 rounded-lg transition"
-              >
-                <FontAwesomeIcon icon={faChevronLeft} />
-              </button>
-              <div className="flex items-center gap-2">
-                {selectedChat.profileImage && selectedChat.profileImage !== "" ? (
-                  <img
-                    src={selectedChat.profileImage || "/placeholder.svg"}
-                    alt={selectedChat.username}
-                    className="w-8 h-8 rounded-full object-cover border-2 border-white"
-                  />
-                ) : (
-                  <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white font-bold border-2 border-white text-sm">
-                    {selectedChat.username?.[0]?.toUpperCase()}
-                  </div>
-                )}
-                <div>
-                  <h3 className="font-bold text-sm">{selectedChat.username}</h3>
-                  <p className="text-xs opacity-90">Online</p>
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => handleOpenProfile(selectedChat.userId, false)}
-                className="cursor-pointer p-2 hover:bg-white/10 rounded-lg transition"
-              >
-                <FontAwesomeIcon icon={faEllipsisV} />
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Mobile Menu Button - Only shown on mobile when no chat selected */}
-      {!selectedChat && (
-        <button
-          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="md:hidden fixed top-4 left-4 z-50 cursor-pointer p-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg shadow-lg"
-        >
-          <FontAwesomeIcon icon={isMobileMenuOpen ? faTimes : faBars} />
-        </button>
-      )}
-
       {/* Sidebar */}
       <div
         className={`
-          ${selectedChat ? "hidden md:flex" : "flex"}
-          ${isMobileMenuOpen ? "flex fixed inset-0 z-40" : "hidden md:flex"}
-          w-full md:w-80 bg-white shadow-xl flex-col transition-all duration-300
+          ${selectedChat ? "hidden md:flex" : "flex w-full"}
+          md:w-96 bg-white border-r border-gray-200 flex-col transition-all duration-300
         `}
       >
         {/* Header */}
-        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-4 sm:p-5 text-white">
-          <div className="flex items-center justify-between mb-4">
-            <div
-              className="flex items-center gap-3 cursor-pointer hover:bg-white/10 p-2 rounded-xl transition flex-1 min-w-0 group"
-              onClick={() => handleOpenProfile(user.id, true)}
-            >
+        <div className="bg-gray-50 p-4 border-b border-gray-200 flex items-center justify-between sticky top-0 z-10 h-16 shadow-sm">
+          <div
+            className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition"
+            onClick={() => handleOpenProfile(user.id, true)}
+          >
+            <div className="relative">
               {user?.profileImage && user.profileImage !== "" ? (
-                <div className="relative">
-                  <img
-                    src={user.profileImage || "/placeholder.svg"}
-                    alt="Profile"
-                    className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border-3 border-white/80 flex-shrink-0"
-                  />
-                  <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
-                </div>
+                <img
+                  src={user.profileImage || "/placeholder.svg"}
+                  alt="Profile"
+                  className="w-10 h-10 rounded-full object-cover border border-gray-200"
+                />
               ) : (
-                <div className="relative">
-                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-white/30 to-white/10 flex items-center justify-center text-white font-bold text-lg sm:text-xl border-3 border-white/80 flex-shrink-0">
-                    {user?.username?.[0]?.toUpperCase()}
-                  </div>
-                  <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold text-lg">
+                  {user?.username?.[0]?.toUpperCase()}
                 </div>
               )}
-              <div className="min-w-0">
-                <h2 className="text-sm sm:text-lg font-bold truncate">
-                  {user?.username}
-                </h2>
-                <p className="text-xs opacity-90 group-hover:opacity-100 transition">
-                  <span className="inline-block w-2 h-2 bg-green-500 rounded-full mr-2"></span>
-                  Online
-                </p>
-              </div>
+              <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
             </div>
-            <button
-              onClick={handleLogout}
-              className="cursor-pointer bg-white/20 hover:bg-white/30 px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm transition flex items-center gap-2 flex-shrink-0"
-            >
-              <FontAwesomeIcon icon={faSignOutAlt} className="text-sm" />
-              <span className="hidden sm:inline">Logout</span>
-            </button>
+            {/* Username only visible on slightly larger screens if sidebar is narrow, but here sidebar is fixed width on desktop */}
+            <div className="hidden sm:block">
+               <h2 className="font-semibold text-gray-800 text-sm truncate max-w-[120px]">
+                 {user?.username}
+               </h2>
+            </div>
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex gap-2">
-            <button
-              onClick={handleToggleFriendRequests}
-              className="cursor-pointer flex-1 bg-white/20 hover:bg-white/30 px-3 sm:px-4 py-3 rounded-xl text-xs sm:text-sm transition flex items-center justify-center gap-2"
-            >
-              <FontAwesomeIcon icon={faUserFriends} />
-              <span>{showFriendRequests ? "Back to Chats" : "Friends"}</span>
-              {unreadRequests > 0 && (
-                <span className="bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                  {unreadRequests}
-                </span>
-              )}
-            </button>
-            
-            {selectedChat && (
+          <div className="flex items-center gap-1">
+             <button
+               onClick={handleToggleFriendRequests}
+               className={`p-2 rounded-full hover:bg-gray-100 transition relative ${showFriendRequests ? "text-indigo-600 bg-indigo-50" : "text-gray-600"}`}
+               title="Friend Requests"
+             >
+               <FontAwesomeIcon icon={faUserFriends} />
+               {unreadRequests > 0 && (
+                 <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center border-2 border-white">
+                   {unreadRequests}
+                 </span>
+               )}
+             </button>
+             
+             {selectedChat && (
               <button
                 onClick={() => setShowMediaGallery(true)}
-                className="cursor-pointer bg-white/20 hover:bg-white/30 px-4 py-3 rounded-xl transition flex items-center justify-center"
-                title="View shared media"
+                className="p-2 rounded-full hover:bg-gray-100 text-gray-600 transition"
+                title="Shared Media"
               >
                 <FontAwesomeIcon icon={faFolder} />
               </button>
-            )}
+             )}
+
+             <button
+               onClick={handleLogout}
+               className="p-2 rounded-full hover:bg-red-50 text-red-500 transition"
+               title="Logout"
+             >
+               <FontAwesomeIcon icon={faSignOutAlt} />
+             </button>
           </div>
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
+        <div className="flex-1 overflow-hidden">
           {showFriendRequests ? (
             <FriendRequests 
               onOpenProfile={handleOpenProfile} 
@@ -474,26 +408,13 @@ export default function ChatApp() {
             />
           )}
         </div>
-
-        {/* Bottom Info */}
-        <div className="p-3 border-t border-gray-100 bg-gray-50">
-          <div className="text-center">
-            <p className="text-xs text-gray-500">
-              MERN Chat App v1.0
-            </p>
-            <p className="text-xs text-gray-400 mt-1">
-              Connected • Secure • Encrypted
-            </p>
-          </div>
-        </div>
       </div>
 
       {/* Chat Area */}
       <div
         className={`
-          ${selectedChat ? "flex" : "hidden md:flex"}
-          flex-1 flex-col transition-all duration-300
-          ${selectedChat ? "pt-12 md:pt-0" : ""}
+          ${selectedChat ? "fixed inset-0 z-50 md:static md:flex" : "hidden md:flex"}
+          flex-1 flex-col bg-white transition-all duration-300
         `}
       >
         {selectedChat ? (
