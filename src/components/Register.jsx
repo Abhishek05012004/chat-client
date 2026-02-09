@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { useNavigate, Link } from "react-router-dom"
-import { toast } from "react-toastify"
+
 import api from "../utils/api"
 
 export default function Register() {
@@ -38,9 +38,9 @@ export default function Register() {
 
       setUserId(response.data.userId)
       setStep(2)
-      toast.success("OTP sent to your email!")
+
     } catch (error) {
-      toast.error(error.response?.data?.message || "Registration failed")
+
     } finally {
       setLoading(false)
     }
@@ -57,9 +57,9 @@ export default function Register() {
       })
 
       setStep(3)
-      toast.success("OTP verified successfully!")
+
     } catch (error) {
-      toast.error(error.response?.data?.message || "OTP verification failed")
+
     } finally {
       setLoading(false)
     }
@@ -70,9 +70,9 @@ export default function Register() {
 
     try {
       await api.post("/api/auth/resend-otp", { userId })
-      toast.success("OTP resent to your email!")
+
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to resend OTP")
+
     } finally {
       setLoading(false)
     }
@@ -82,12 +82,12 @@ export default function Register() {
     e.preventDefault()
 
     if (formData.password !== formData.confirmPassword) {
-      toast.error("Passwords do not match")
+
       return
     }
 
     if (formData.password.length < 6) {
-      toast.error("Password must be at least 6 characters")
+
       return
     }
 
@@ -99,10 +99,10 @@ export default function Register() {
         password: formData.password,
       })
 
-      toast.success("Registration completed! Redirecting to login...")
+
       setTimeout(() => navigate("/login"), 2000)
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to set password")
+
     } finally {
       setLoading(false)
     }

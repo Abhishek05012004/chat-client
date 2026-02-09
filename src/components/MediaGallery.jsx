@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import api from "../utils/api"
-import { toast } from "react-toastify"
+
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome"
 import { 
   faTimes, 
@@ -51,7 +51,7 @@ export default function MediaGallery({ chat, isOpen, onClose }) {
       setMedia(response.data.media || [])
     } catch (error) {
       console.error("[v0] Fetch media error:", error)
-      toast.error("Failed to load media")
+
     } finally {
       setLoading(false)
     }

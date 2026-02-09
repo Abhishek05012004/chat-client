@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import api from "../utils/api"
-import { toast } from "react-toastify"
+
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome"
 import { 
   faComment, 
@@ -123,7 +123,7 @@ export default function UserList({ selectedChat, onSelectChat, socket, onOpenPro
     } catch (error) {
       console.error("[v0] Fetch data error:", error)
       // Only show error toast on initial load failure, not background refresh
-      if (loading) toast.error("Failed to load data")
+
     } finally {
       setLoading(false)
     }
@@ -133,10 +133,10 @@ export default function UserList({ selectedChat, onSelectChat, socket, onOpenPro
     setActionLoading({ ...actionLoading, [userId]: 'friend' })
     try {
       await api.post("/api/friends/request", { receiverId: userId })
-      toast.success("Friend request sent!")
+
       fetchData()
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to send friend request")
+
     } finally {
       setActionLoading({ ...actionLoading, [userId]: null })
     }
@@ -149,7 +149,7 @@ export default function UserList({ selectedChat, onSelectChat, socket, onOpenPro
       onSelectChat(response.data.chat)
       setActiveTab("chats")
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to start chat")
+
     } finally {
       setActionLoading({ ...actionLoading, [userId]: null })
     }

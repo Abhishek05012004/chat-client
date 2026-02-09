@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import api from "../utils/api"
-import { toast } from "react-toastify"
+
 import { useAuth } from "../context/AuthContext"
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome"
 import { 
@@ -41,7 +41,7 @@ export default function ProfileModal({ isOpen, onClose, userId, isOwnProfile }) 
 
   useEffect(() => {
     if (isOpen && userId) {
-      toastShownRef.current = false
+
       fetchProfile()
     }
   }, [isOpen, userId])
@@ -56,13 +56,10 @@ export default function ProfileModal({ isOpen, onClose, userId, isOwnProfile }) 
       setUsername(response.data.username || "")
       setImagePreview(response.data.profileImage || "")
       setImageError(false)
-      toastShownRef.current = false
+
     } catch (error) {
       console.error("Error fetching profile:", error)
-      if (!toastShownRef.current) {
-        toast.error("Failed to load profile")
-        toastShownRef.current = true
-      }
+
     } finally {
       setLoading(false)
     }
@@ -72,7 +69,7 @@ export default function ProfileModal({ isOpen, onClose, userId, isOwnProfile }) 
     const file = e.target.files[0]
     if (file) {
       if (file.size > 5000000) {
-        toast.error("Image size should be less than 5MB")
+  
         return
       }
 
@@ -95,7 +92,7 @@ export default function ProfileModal({ isOpen, onClose, userId, isOwnProfile }) 
         username: username,
       })
       
-      toast.success("Profile updated successfully!")
+
       setEditing(false)
 
       updateUser({
@@ -117,20 +114,20 @@ export default function ProfileModal({ isOpen, onClose, userId, isOwnProfile }) 
       fetchProfile()
     } catch (error) {
       console.error("Error updating profile:", error)
-      toast.error(error.response?.data?.message || "Failed to update profile")
+
     }
   }
 
   const handleCopyToClipboard = (text) => {
     if (text) {
       navigator.clipboard.writeText(text)
-      toast.success("Copied to clipboard!")
+
     }
   }
 
   const handleSendMessage = () => {
     if (profile && currentUser) {
-      toast.info(`Starting chat with ${profile.username}`)
+
       console.log("Start chat with:", profile._id)
       onClose()
     }
@@ -138,7 +135,7 @@ export default function ProfileModal({ isOpen, onClose, userId, isOwnProfile }) 
 
   const handleVideoCall = () => {
     if (profile && window.socketInstance) {
-      toast.info(`Calling ${profile.username}`)
+
       
       window.socketInstance.emit("video-call-initiate", {
         callerId: currentUser.id,
@@ -156,7 +153,7 @@ export default function ProfileModal({ isOpen, onClose, userId, isOwnProfile }) 
   }
 
   const handleMoreOptions = () => {
-    toast.info("More options for " + profile.username)
+
     console.log("More options for:", profile._id)
   }
 

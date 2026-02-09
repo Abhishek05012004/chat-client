@@ -9,7 +9,7 @@ import FriendRequests from "./FriendRequests";
 import ProfileModal from "./ProfileModal";
 import MediaGallery from "./MediaGallery";
 import IncomingCallScreen from "./IncomingCallScreen";
-import { toast } from "react-toastify";
+
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { 
   faFolder, 
@@ -45,21 +45,12 @@ export default function ChatApp() {
       });
 
         socketInstance.on("friend-request-received", (data) => {
-        toast.info(`${data.senderUsername} sent you a friend request!`, {
-          toastId: `friend-req-${data.senderId}`,
-          autoClose: 3000,
-        });
+
         setUnreadRequests(prev => prev + 1);
       });
 
       socketInstance.on("friend-request-accepted", (data) => {
-        toast.success(
-          `${data.acceptedByUsername} accepted your friend request!`,
-          {
-            toastId: `friend-accept-${data.userId}`,
-            autoClose: 3000,
-          },
-        );
+
       });
 
       socketInstance.on("user-profile-updated", (data) => {
@@ -82,37 +73,22 @@ export default function ChatApp() {
             clearTimeout(callTimers[data.callerId]);
           }
           
-          // Check if we're already in a chat with the caller
-          const isFromCurrentChat = selectedChat && 
-            (selectedChat._id === data.chatId || 
-             selectedChat.userId === data.callerId || 
-             selectedChat.participants?.some(p => p._id === data.callerId));
+          // Show global incoming call screen ALWAYS
+          setGlobalIncomingCall(data);
+          setShowGlobalCallScreen(true);
           
-          // If we're in the chat with the caller, we should NOT show the global screen
-          // because the VideoCall component will handle it
-          if (isFromCurrentChat) {
-            console.log("[ChatApp] Call is from current chat, letting ChatWindow handle it");
-            // Just set the globalIncomingCall but don't show the global screen
-            setGlobalIncomingCall(data);
-            // DO NOT set showGlobalCallScreen to true
-          } else {
-            // Show global incoming call screen
-            setGlobalIncomingCall(data);
-            setShowGlobalCallScreen(true);
-            
-            // Set timeout to auto-reject after 30 seconds
-            const timer = setTimeout(() => {
-              if (showGlobalCallScreen && globalIncomingCall?.callerId === data.callerId) {
-                console.log("[ChatApp] Call auto-rejecting due to timeout");
-                handleGlobalRejectCall();
-              }
-            }, 30000);
-            
-            setCallTimers(prev => ({
-              ...prev,
-              [data.callerId]: timer
-            }));
-          }
+          // Set timeout to auto-reject after 30 seconds
+          const timer = setTimeout(() => {
+            if (showGlobalCallScreen && globalIncomingCall?.callerId === data.callerId) {
+              console.log("[ChatApp] Call auto-rejecting due to timeout");
+              handleGlobalRejectCall();
+            }
+          }, 30000);
+          
+          setCallTimers(prev => ({
+            ...prev,
+            [data.callerId]: timer
+          }));
         }
       });
 
@@ -130,9 +106,7 @@ export default function ChatApp() {
         }
         
         if (data.callerId === user.id) {
-          toast.warning(
-            `Call rejected by ${data.receiverName || "the other user"}`,
-          );
+
         }
         setGlobalIncomingCall(null);
         setShowGlobalCallScreen(false);
@@ -157,14 +131,12 @@ export default function ChatApp() {
 
       socketInstance.on("call:busy", (data) => {
         console.log("[ChatApp] User is busy:", data);
-        toast.warning(data.message || "Sorry, the other user is already on a video call with someone else", {
-          autoClose: 5000,
-        });
+
       });
 
       socketInstance.on("call:user-offline", (data) => {
         console.log("[ChatApp] User is offline:", data);
-        toast.error(data.message || "User is offline");
+
       });
 
       return () => {
@@ -239,7 +211,7 @@ export default function ChatApp() {
           chatToSelect = response.data.chat;
         } catch (error) {
           console.error("[ChatApp] Error creating chat:", error);
-          toast.error("Failed to open chat");
+
           return;
         }
       }
@@ -260,12 +232,12 @@ export default function ChatApp() {
           setGlobalIncomingCall(null);
         }, 100);
       } else {
-        toast.error("Could not find or create chat");
+
         setShowGlobalCallScreen(false);
       }
     } catch (error) {
       console.error("[ChatApp] Error in handleGlobalAcceptCall:", error);
-      toast.error("Failed to accept call");
+
       setShowGlobalCallScreen(false);
     }
   };
@@ -310,18 +282,8 @@ export default function ChatApp() {
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-gray-50 to-gray-100 overflow-hidden">
-      {/* Global incoming call screen - Show ONLY when no chat is selected or call is not from current chat */}
-      {showGlobalCallScreen && globalIncomingCall && !selectedChat && (
-        <IncomingCallScreen
-          incomingCall={globalIncomingCall}
-          onAccept={handleGlobalAcceptCall}
-          onReject={handleGlobalRejectCall}
-          callerInfo={{
-            username: globalIncomingCall.callerName,
-            profileImage: globalIncomingCall.callerProfile?.profileImage,
-          }}
-        />
-      )}
+      {/* Global incoming call screen - Show whenever showGlobalCallScreen is true */}
+
 
       {/* Sidebar */}
       <div
@@ -492,6 +454,19 @@ export default function ChatApp() {
           chat={selectedChat}
           isOpen={showMediaGallery}
           onClose={() => setShowMediaGallery(false)}
+        />
+      )}
+
+      {/* Global incoming call screen - Show whenever showGlobalCallScreen is true */}
+      {showGlobalCallScreen && globalIncomingCall && (
+        <IncomingCallScreen
+          incomingCall={globalIncomingCall}
+          onAccept={handleGlobalAcceptCall}
+          onReject={handleGlobalRejectCall}
+          callerInfo={{
+            username: globalIncomingCall.callerName,
+            profileImage: globalIncomingCall.callerProfile?.profileImage,
+          }}
         />
       )}
 

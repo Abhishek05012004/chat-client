@@ -27,7 +27,7 @@ export default function IncomingCallScreen({ incomingCall, onAccept, onReject, c
   }
 
   return (
-    <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-[9999] backdrop-blur-sm p-4">
       <div className="bg-gradient-to-b from-gray-900 to-black rounded-2xl p-6 md:p-8 text-center max-w-sm w-full mx-auto shadow-2xl border border-gray-700">
         <div className="mb-4 md:mb-6">
           {callerInfo?.profileImage ? (

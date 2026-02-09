@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from "react"
-import { toast } from "react-toastify"
+
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome"
 import {
   faMicrophone,
@@ -181,7 +181,7 @@ export default function VideoCall({
       return stream
     } catch (error) {
       console.error("[VideoCall] Error getting local media:", error)
-      toast.error("Please allow camera and microphone permissions")
+
       throw error
     }
   }
@@ -267,7 +267,7 @@ export default function VideoCall({
         if (callStateRef.current !== CALL_STATES.CONNECTED) {
           setCallState(CALL_STATES.CONNECTED)
           callStateRef.current = CALL_STATES.CONNECTED
-          toast.success("Call connected!")
+
         }
       }
 
@@ -280,11 +280,11 @@ export default function VideoCall({
           console.log("[VideoCall] Peer connection established!")
           setCallState(CALL_STATES.CONNECTED)
           callStateRef.current = CALL_STATES.CONNECTED
-          toast.success("Connected!")
+
         } else if (state === "failed" || state === "disconnected") {
           console.log("[VideoCall] Connection failed/disconnected")
           if (callStateRef.current !== CALL_STATES.IDLE) {
-            toast.warning("Connection lost")
+
           }
         } else if (state === "closed") {
           console.log("[VideoCall] Connection closed")
@@ -300,7 +300,7 @@ export default function VideoCall({
           console.log("[VideoCall] ICE connection successful")
         } else if (state === "failed") {
           console.log("[VideoCall] ICE connection failed")
-          toast.error("Connection failed. Please try again.")
+
         } else if (state === "disconnected") {
           console.log("[VideoCall] ICE disconnected")
         }
@@ -310,7 +310,7 @@ export default function VideoCall({
       return peerConnection
     } catch (error) {
       console.error("[VideoCall] Error initializing peer connection:", error)
-      toast.error("Cannot access camera/microphone: " + error.message)
+
       return null
     }
   }
@@ -321,7 +321,7 @@ export default function VideoCall({
       console.log("[VideoCall] Initiating call...")
       
       if (!socket) {
-        toast.error("Socket not connected")
+
         return
       }
 
@@ -329,7 +329,7 @@ export default function VideoCall({
       const receiverId = getUserId(otherUser)
 
       if (!callerId || !receiverId) {
-        toast.error("User information incomplete")
+
         console.error("[VideoCall] Missing user IDs - callerId:", callerId, "receiverId:", receiverId)
         return
       }
@@ -341,7 +341,7 @@ export default function VideoCall({
       // Initialize peer connection and get media
       const pc = await initializePeerConnection(true)
       if (!pc) {
-        toast.error("Failed to initialize peer connection")
+
         setCallState(CALL_STATES.IDLE)
         callStateRef.current = CALL_STATES.IDLE
         return
@@ -374,7 +374,7 @@ export default function VideoCall({
       missedCallTimerRef.current = setTimeout(() => {
         if (callStateRef.current === CALL_STATES.CALLING) {
           console.log("[VideoCall] Call timeout - no answer")
-          toast.info("Call not answered")
+
           if (chat?._id && onCallLog) {
             onCallLog(chat._id, "no_answer", getUserId(currentUser))
           }
@@ -382,10 +382,10 @@ export default function VideoCall({
         }
       }, 30000)
       
-      toast.info("Calling " + otherUser.username + "...")
+
     } catch (error) {
       console.error("[VideoCall] Error initiating call:", error)
-      toast.error("Failed to initiate call: " + error.message)
+
       setCallState(CALL_STATES.IDLE)
       callStateRef.current = CALL_STATES.IDLE
     }
@@ -397,7 +397,7 @@ export default function VideoCall({
       console.log("[VideoCall] Accepting call...")
       
       if (!incomingCallData) {
-        toast.error("No incoming call")
+
         return
       }
 
@@ -412,7 +412,7 @@ export default function VideoCall({
       // This ensures local video is set up before anything else
       const pc = await initializePeerConnection(false)
       if (!pc) {
-        toast.error("Failed to initialize peer connection")
+
         return
       }
 
@@ -457,10 +457,10 @@ export default function VideoCall({
         })
       }
 
-      toast.success("Call accepted! Connecting...")
+
     } catch (error) {
       console.error("[VideoCall] Error accepting call:", error)
-      toast.error("Failed to accept call: " + error.message)
+
       rejectCall()
     }
   }
@@ -486,7 +486,7 @@ export default function VideoCall({
     callStateRef.current = CALL_STATES.IDLE
     setIncomingCallData(null)
     onCallEnd?.()
-    toast.info("Call rejected")
+
   }
 
   useEffect(() => {
@@ -530,7 +530,7 @@ export default function VideoCall({
     callStateRef.current = CALL_STATES.IDLE
     setIncomingCallData(null)
     onCallEnd?.()
-    toast.info("Call ended")
+
   }
 
   // Toggle mute
@@ -546,10 +546,10 @@ export default function VideoCall({
         })
         
         setIsMuted(!isMuted)
-        toast.info(!isMuted ? "Microphone muted" : "Microphone unmuted")
+
       } else {
         console.error("[VideoCall] No audio tracks found")
-        toast.error("No microphone available")
+
       }
     }
   }
@@ -567,10 +567,10 @@ export default function VideoCall({
         })
         
         setIsVideoOn(!isVideoOn)
-        toast.info(!isVideoOn ? "Camera turned off" : "Camera turned on")
+
       } else {
         console.error("[VideoCall] No video tracks found")
-        toast.error("No camera available")
+
       }
     }
   }
@@ -632,7 +632,7 @@ export default function VideoCall({
           // Initialize peer connection and get media FIRST
           const pc = await initializePeerConnection(false)
           if (!pc) {
-            toast.error("Failed to initialize peer connection")
+
             return
           }
 
@@ -677,10 +677,10 @@ export default function VideoCall({
             })
           }
 
-          toast.success("Call accepted! Connecting...")
+
         } catch (error) {
           console.error("[VideoCall] Error in auto-accept:", error)
-          toast.error("Failed to accept call: " + error.message)
+
           rejectCall()
         }
       }, 200)
@@ -780,10 +780,10 @@ export default function VideoCall({
             
             setCallState(CALL_STATES.CONNECTED)
             callStateRef.current = CALL_STATES.CONNECTED
-            toast.success("Call connected!")
+
           } catch (error) {
             console.error("[VideoCall] Error setting remote description:", error)
-            toast.error("Failed to set remote description: " + error.message)
+
           }
         } else {
           console.warn("[VideoCall] Peer connection not ready or closed")
@@ -813,13 +813,13 @@ export default function VideoCall({
       if (callStateRef.current === CALL_STATES.CALLING) {
         setCallState(CALL_STATES.CONNECTED)
         callStateRef.current = CALL_STATES.CONNECTED
-        toast.success("Call accepted!")
+
       }
     }
 
     const handleCallRejected = (data) => {
       console.log("[VideoCall] Call rejected by", data.receiverId)
-      toast.warning(`Call rejected by ${data.receiverName || "the other user"}`)
+
       if (chat?._id && onCallLog && isCallInitiator) {
         onCallLog(chat._id, "rejected", getUserId(currentUser))
       }
@@ -849,7 +849,7 @@ export default function VideoCall({
         callStateRef.current = CALL_STATES.IDLE
         setIncomingCallData(null)
         onCallEnd?.()
-        toast.info("Call ended")
+
       }
     }
 
@@ -885,13 +885,13 @@ export default function VideoCall({
 
     socket.on("call:user-offline", (data) => {
       console.log("[VideoCall] User offline:", data)
-      toast.error(data.message || `${otherUser.username} is offline`)
+
       endCall()
     })
 
     socket.on("call:busy", (data) => {
       console.log("[VideoCall] User busy:", data)
-      toast.warning(data.message || `${otherUser.username} is busy on another call`)
+
       endCall()
     })
 

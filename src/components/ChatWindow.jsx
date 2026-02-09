@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import api from "../utils/api"
-import { toast } from "react-toastify"
+
 import EmojiPicker from "emoji-picker-react"
 import VideoCall from "./VideoCall"
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome"
@@ -253,33 +253,7 @@ export default function ChatWindow({
         }
       })
 
-      socket.on("call:incoming", (data) => {
-        console.log("[ChatWindow] Incoming call received from", data.callerId, "to", data.receiverId)
-        console.log("[ChatWindow] Current user:", currentUser.id, "Other user:", otherUser._id, "Chat ID:", chat._id)
-        console.log("[ChatWindow] Call data:", data)
-        
-        // Check if this call is for the current user
-        if (data.receiverId !== currentUser.id) {
-          console.log("[ChatWindow] Call not for current user, ignoring")
-          return
-        }
-        
-        // IMPORTANT: Don't set incomingVideoCall state here
-        // Let ChatApp handle the global incoming call screen
-        // The VideoCall component will handle calls from the current chat
-        
-        // If this call is for the current chat, just log it
-        const isForThisChat = (data.chatId && data.chatId === chat._id) || 
-                              (data.callerId === otherUser._id)
-        
-        if (isForThisChat) {
-          console.log("[ChatWindow] Call is for current chat, VideoCall component will handle it");
-          // Only set incomingVideoCall if this is for the current chat
-          // and we're not already showing a global call screen
-          setIncomingVideoCall(data);
-          setIsVideoCallMode(true);
-        }
-      })
+
 
       socket.on("user-status-changed", (data) => {
         console.log("[ChatWindow] Status change received:", data)
@@ -305,7 +279,6 @@ export default function ChatWindow({
         socket.off("video-call-offer")
         socket.off("video-call-end")
         socket.off("call:accepted-notification")
-        socket.off("call:incoming")
         socket.off("user-status-changed")
         socket.off("call:ended")
       }
@@ -318,8 +291,10 @@ export default function ChatWindow({
       const isForThisChat = globalIncomingCall.chatId === chat._id || 
                            globalIncomingCall.callerId === otherUser._id
       
-      if (isForThisChat && globalIncomingCall.receiverId === currentUser.id) {
-        console.log("[ChatWindow] Setting incoming call from global call screen, autoAccept:", globalIncomingCall.autoAccept)
+      // ONLY accept if autoAccept is true (meaning user clicked Accept on global screen)
+      // Otherwise, let ChatApp show the global incoming call screen
+      if (isForThisChat && globalIncomingCall.receiverId === currentUser.id && globalIncomingCall.autoAccept) {
+        console.log("[ChatWindow] Global call accepted by user, entering video call mode")
         
         // Only set incomingVideoCall if we're in the right chat
         setIncomingVideoCall(globalIncomingCall)
@@ -387,7 +362,7 @@ export default function ChatWindow({
       setMessages(response.data.messages)
     } catch (error) {
       console.error("Fetch messages error:", error)
-      toast.error("Failed to load messages")
+
     } finally {
       setLoading(false)
     }
@@ -472,7 +447,7 @@ export default function ChatWindow({
       stopTyping()
     } catch (error) {
       console.error("Send message error:", error)
-      toast.error("Failed to send message")
+
     }
   }
 
@@ -517,10 +492,10 @@ export default function ChatWindow({
       setMessages((prev) => [...prev, response.data.message])
       setSelectedFile(null)
       setFileCaption("")
-      toast.success("File sent successfully")
+
     } catch (error) {
       console.error("File upload error:", error)
-      toast.error(error.response?.data?.message || "Failed to upload file")
+
     } finally {
       setUploading(false)
     }
@@ -562,11 +537,11 @@ export default function ChatWindow({
         })
       }
 
-      toast.success(`Message deleted ${deleteType === "everyone" ? "for everyone" : ""}`)
+
       setShowDeleteMenu(null)
     } catch (error) {
       console.error("Delete message error:", error)
-      toast.error(error.response?.data?.message || "Failed to delete message")
+
     }
   }
 
@@ -634,7 +609,7 @@ export default function ChatWindow({
       setShowReactionPicker(null)
     } catch (error) {
       console.error("Reaction error:", error)
-      toast.error("Failed to add reaction")
+
     }
   }
 
@@ -682,7 +657,7 @@ export default function ChatWindow({
 
   const handleStartVideoCall = () => {
     if (!otherUserOnline) {
-      toast.warning(`${otherUser.username} is not online`)
+
       return
     }
     
@@ -1050,9 +1025,9 @@ export default function ChatWindow({
                           {/* Message actions (Menu) */}
                           {!isCallMessage && (
                           <div
-                            className={`absolute top-0 ${isOwn 
+                            className={`absolute top-1/2 -translate-y-1/2 ${isOwn 
                               ? "left-0 -translate-x-full pr-2" 
-                              : "right-0 translate-x-full pl-2"} opacity-0 group-hover:opacity-100 transition-opacity flex items-center h-full`}
+                              : "right-0 translate-x-full pl-2"} opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex items-center`}
                           >
                             <div className="bg-white/90 backdrop-blur-sm border border-gray-100 rounded-lg shadow-sm flex items-center p-0.5 gap-0.5">
                               <button

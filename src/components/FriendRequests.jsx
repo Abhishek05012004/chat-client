@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import api from "../utils/api"
-import { toast } from "react-toastify"
+
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome"
 import { 
   faUserPlus, 
@@ -40,7 +40,7 @@ export default function FriendRequests({ onOpenProfile, onRequestHandled, search
       }
     } catch (error) {
       console.error("Fetch requests error:", error)
-      toast.error("Failed to load friend requests")
+
     } finally {
       setLoading(false)
     }
@@ -50,11 +50,11 @@ export default function FriendRequests({ onOpenProfile, onRequestHandled, search
     setActionLoading({ ...actionLoading, [requestId]: 'accept' })
     try {
       await api.post(`/api/friends/request/${requestId}/accept`)
-      toast.success("Friend request accepted!")
+
       if (onRequestHandled) onRequestHandled()
       fetchRequests()
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to accept request")
+
     } finally {
       setActionLoading({ ...actionLoading, [requestId]: null })
     }
@@ -64,11 +64,11 @@ export default function FriendRequests({ onOpenProfile, onRequestHandled, search
     setActionLoading({ ...actionLoading, [requestId]: 'reject' })
     try {
       await api.post(`/api/friends/request/${requestId}/reject`)
-      toast.info("Friend request rejected")
+
       if (onRequestHandled) onRequestHandled()
       fetchRequests()
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to reject request")
+
     } finally {
       setActionLoading({ ...actionLoading, [requestId]: null })
     }
@@ -78,10 +78,10 @@ export default function FriendRequests({ onOpenProfile, onRequestHandled, search
     setActionLoading({ ...actionLoading, [requestId]: 'cancel' })
     try {
       await api.post(`/api/friends/request/${requestId}/cancel`)
-      toast.info("Friend request cancelled")
+
       fetchRequests()
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to cancel request")
+
     } finally {
       setActionLoading({ ...actionLoading, [requestId]: null })
     }

@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { useNavigate, Link } from "react-router-dom"
-import { toast } from "react-toastify"
+
 import api from "../utils/api"
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome"
 import { 
@@ -44,9 +44,9 @@ export default function ForgotPassword() {
       })
       setUserId(response.data.userId)
       setStep(2)
-      toast.success("OTP sent to your registered email!")
+
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to send OTP")
+
     } finally {
       setLoading(false)
     }
@@ -63,9 +63,9 @@ export default function ForgotPassword() {
         otp: formData.otp,
       })
       setStep(3)
-      toast.success("OTP verified! Set your new password")
+
     } catch (error) {
-      toast.error(error.response?.data?.message || "Invalid OTP")
+
     } finally {
       setLoading(false)
     }
@@ -76,12 +76,12 @@ export default function ForgotPassword() {
     e.preventDefault()
 
     if (formData.password !== formData.confirmPassword) {
-      toast.error("Passwords do not match!")
+
       return
     }
 
     if (formData.password.length < 6) {
-      toast.error("Password must be at least 6 characters")
+
       return
     }
 
@@ -92,10 +92,10 @@ export default function ForgotPassword() {
         userId,
         password: formData.password,
       })
-      toast.success("Password reset successful! You can now login")
+
       setTimeout(() => navigate("/login"), 2000)
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to reset password")
+
     } finally {
       setLoading(false)
     }
@@ -105,9 +105,9 @@ export default function ForgotPassword() {
     setLoading(true)
     try {
       await api.post("/api/auth/resend-forgot-otp", { userId })
-      toast.success("OTP resent to your email!")
+
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to resend OTP")
+
     } finally {
       setLoading(false)
     }
