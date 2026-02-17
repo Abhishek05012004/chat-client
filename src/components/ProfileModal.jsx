@@ -169,7 +169,7 @@ export default function ProfileModal({ isOpen, onClose, userId, isOwnProfile }) 
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-4 sm:p-6 rounded-t-xl sm:rounded-t-2xl sticky top-0 z-10">
+        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-4 sm:p-6 rounded-t-xl sm:rounded-t-2xl z-10">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 sm:gap-3">
               <div className="p-2 bg-white/20 rounded-lg">
@@ -207,7 +207,7 @@ export default function ProfileModal({ isOpen, onClose, userId, isOwnProfile }) 
             <div>
               {/* Profile Header - Fixed image cutting issue */}
               <div className="flex flex-col items-center mb-4 sm:mb-6">
-                <div className="relative -mt-10 sm:-mt-16">
+                <div className="relative -mt-10 sm:-mt-16 z-20">
                   <div className="relative">
                     {/* Profile Image Container - Fixed to prevent cutting */}
                     <div className="w-24 h-24 sm:w-32 sm:h-32 md:w-40 md:h-40 rounded-full overflow-hidden border-4 border-white shadow-xl bg-gradient-to-br from-indigo-100 to-purple-100">

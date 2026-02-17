@@ -59,11 +59,13 @@ export default function ChatWindow({
   const [uploading, setUploading] = useState(false)
   const [fileCaption, setFileCaption] = useState("")
   const [selectedFile, setSelectedFile] = useState(null)
+  const [deleteMenuPosition, setDeleteMenuPosition] = useState("down")
   const [showDeleteMenu, setShowDeleteMenu] = useState(null)
   const [isVideoCallMode, setIsVideoCallMode] = useState(false)
   const [incomingVideoCall, setIncomingVideoCall] = useState(null)
   const [otherUserOnline, setOtherUserOnline] = useState(false)
   const [emojiPickerPosition, setEmojiPickerPosition] = useState({ top: 0, left: 0 })
+  const [pickerDimensions, setPickerDimensions] = useState({ width: 300, height: 400 })
   const [isCallFullScreen, setIsCallFullScreen] = useState(false)
   const messagesEndRef = useRef(null)
   const messageRefs = useRef({})
@@ -719,25 +721,55 @@ export default function ChatWindow({
     }
   }
 
-  const handleToggleEmojiPicker = () => {
+  const handleToggleEmojiPicker = (event) => {
     if (showEmojiPicker) {
       setShowEmojiPicker(false)
     } else {
-      const inputRect = inputRef.current?.getBoundingClientRect()
+      // Use the button as the anchor, or fallback to input
+      const anchorRect = event?.currentTarget?.getBoundingClientRect() || inputRef.current?.getBoundingClientRect()
       const windowHeight = window.innerHeight
-      const pickerHeight = 350
+      const windowWidth = window.innerWidth
       
-      if (inputRect && windowHeight - inputRect.bottom > pickerHeight + 10) {
-        setEmojiPickerPosition({
-          top: inputRect.bottom + 5,
-          left: inputRect.left,
-        })
-      } else {
-        setEmojiPickerPosition({
-          top: inputRect?.top - pickerHeight - 5 || 0,
-          left: inputRect?.left || 0,
-        })
+      const isMobile = windowWidth < 640
+      const pickerWidth = isMobile ? Math.min(windowWidth - 20, 350) : 350
+      
+      let top = 0
+      let left = 0
+      let height = 300
+
+      if (anchorRect) {
+        // Calculate available space
+        const spaceAbove = anchorRect.top - 10
+        const spaceBelow = windowHeight - anchorRect.bottom - 10
+        const maxPickerHeight = 450
+        
+        // Prefer position with more space
+        if (spaceAbove > spaceBelow) {
+             // Position top
+             height = Math.min(spaceAbove - 10, maxPickerHeight)
+             // If height ends up too small, clamp it (might overlap, but better than unusable)
+             height = Math.max(height, 250)
+             top = anchorRect.top - height - 10
+        } else {
+             // Position bottom
+             height = Math.min(spaceBelow - 10, maxPickerHeight)
+             height = Math.max(height, 250)
+             top = anchorRect.bottom + 10
+        }
+
+        // Horizontal positioning - Center relative to anchor
+        const anchorCenter = anchorRect.left + (anchorRect.width / 2)
+        left = anchorCenter - (pickerWidth / 2)
+
+        // Strict clamp to screen edges
+        if (left < 10) left = 10
+        if (left + pickerWidth > windowWidth - 10) {
+          left = windowWidth - pickerWidth - 10
+        }
       }
+      
+      setPickerDimensions({ width: pickerWidth, height })
+      setEmojiPickerPosition({ top, left })
       setShowEmojiPicker(true)
     }
   }
@@ -748,19 +780,51 @@ export default function ChatWindow({
     } else {
       const buttonRect = event.currentTarget.getBoundingClientRect()
       const windowHeight = window.innerHeight
-      const pickerHeight = 300
+      const windowWidth = window.innerWidth
       
-      if (buttonRect.top < pickerHeight + 10) {
-        setEmojiPickerPosition({
-          top: buttonRect.bottom + 5,
-          left: buttonRect.left - 100,
-        })
+      const isMobile = windowWidth < 640
+      const pickerWidth = isMobile ? Math.min(windowWidth - 20, 300) : 300
+      
+      let top = 0
+      let left = 0
+      let height = 300
+
+      const spaceAbove = buttonRect.top - 10
+      const spaceBelow = windowHeight - buttonRect.bottom - 10
+      const maxPickerHeight = 350
+
+      // Vertical positioning logic
+      if (spaceAbove > spaceBelow && spaceAbove > 200) {
+         // Go up
+         height = Math.min(spaceAbove - 10, maxPickerHeight)
+         top = buttonRect.top - height - 5
       } else {
-        setEmojiPickerPosition({
-          top: buttonRect.top - pickerHeight - 5,
-          left: buttonRect.left - 100,
-        })
+         // Go down (or if forced)
+         height = Math.min(spaceBelow - 10, maxPickerHeight)
+         // Check if space below is really tiny, if so, force up even if it overlaps slightly or use max available
+         if (height < 200 && spaceAbove > height) {
+            height = Math.min(spaceAbove - 10, maxPickerHeight)
+            top = buttonRect.top - height - 5
+         } else {
+             top = buttonRect.bottom + 5
+         }
       }
+      
+      // Ensure min height
+      height = Math.max(height, 250)
+
+      // Horizontal positioning - Center relative to button
+      const buttonCenter = buttonRect.left + (buttonRect.width / 2)
+      left = buttonCenter - (pickerWidth / 2)
+      
+      // Boundary checks
+      if (left < 10) left = 10
+      if (left + pickerWidth > windowWidth - 10) {
+        left = windowWidth - pickerWidth - 10
+      }
+      
+      setPickerDimensions({ width: pickerWidth, height })
+      setEmojiPickerPosition({ top, left })
       setShowReactionPicker(messageId)
     }
   }
@@ -851,8 +915,15 @@ export default function ChatWindow({
         </div>
       </div>
 
-      <div className={`flex-1 overflow-y-auto bg-[#e5ddd5] p-4 ${isVideoCallMode && !isCallFullScreen ? 'opacity-30 pointer-events-none' : ''}`}
-           style={{ backgroundImage: "url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png')", backgroundRepeat: 'repeat', backgroundSize: '400px' }}>
+      <div 
+        className={`flex-1 overflow-y-auto bg-[#e5ddd5] p-2 sm:p-4 ${isVideoCallMode && !isCallFullScreen ? 'opacity-30 pointer-events-none' : ''}`}
+        style={{ backgroundImage: "url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png')", backgroundRepeat: 'repeat', backgroundSize: '400px' }}
+        onScroll={() => {
+          if (showEmojiPicker) setShowEmojiPicker(false)
+          if (showReactionPicker) setShowReactionPicker(null)
+          if (showDeleteMenu) setShowDeleteMenu(null)
+        }}
+      >
         {loading ? (
           <div className="flex items-center justify-center h-full">
             <div className="bg-white/80 backdrop-blur-sm px-4 py-2 rounded-full shadow-sm text-gray-600">Loading messages...</div>
@@ -880,8 +951,6 @@ export default function ChatWindow({
                   const isSystem = message.isSystem
                   const isCallMessage = message.type === "call"
                   const messageStatus = !isCallMessage ? getMessageStatus(message) : null
-                  // Show menu below for all messages except the last few to avoid clipping
-                  const showMenuBelow = !lastMessageIds.has(message._id)
 
                   return isSystem ? (
                     <div key={message._id} className="flex justify-center my-3">
@@ -1039,20 +1108,34 @@ export default function ChatWindow({
                               </button>
 
                               <div ref={deleteMenuRef} className="relative">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    setShowDeleteMenu(showDeleteMenu === message._id ? null : message._id)
-                                  }}
-                                  className="p-1 hover:bg-gray-100 rounded transition-colors text-gray-500 hover:text-red-500"
-                                  title="Delete"
-                                >
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      if (showDeleteMenu === message._id) {
+                                        setShowDeleteMenu(null)
+                                      } else {
+                                        // Smart positioning
+                                        const rect = e.currentTarget.getBoundingClientRect()
+                                        const spaceBelow = window.innerHeight - rect.bottom
+                                        setDeleteMenuPosition(spaceBelow < 150 ? 'up' : 'down')
+                                        setShowDeleteMenu(message._id)
+                                      }
+                                    }}
+                                    className="p-1 hover:bg-gray-100 rounded transition-colors text-gray-500 hover:text-red-500"
+                                    title="Delete"
+                                  >
                                   <FontAwesomeIcon icon={faTrash} className="text-xs" />
                                 </button>
 
                                 {showDeleteMenu === message._id && (
                                   <div
-                                    className={`absolute ${showMenuBelow ? 'top-full mt-1' : 'bottom-full mb-1'} ${isOwn ? 'right-0 origin-top-right' : 'left-0 origin-top-left'} bg-white border border-gray-100 rounded-lg shadow-xl z-50 w-48 overflow-hidden py-1 ring-1 ring-black/5`}
+                                    className={`absolute ${deleteMenuPosition === 'up' ? 'bottom-full mb-1' : 'top-full mt-1'} ${isOwn ? 'right-0 origin-top-right' : 'left-0 origin-top-left'} bg-white border border-gray-100 rounded-lg shadow-xl z-50 w-48 overflow-hidden py-1 ring-1 ring-black/5 mx-2 md:mx-0`}
+                                    style={{
+                                      right: isOwn ? 0 : 'auto',
+                                      left: isOwn ? 'auto' : 0,
+                                      // Ensure it doesn't go off screen on mobile
+                                      maxWidth: 'calc(100vw - 40px)' 
+                                    }}
                                   >
                                     <button
                                       onClick={() => handleDeleteMessage(message._id, "me")}
@@ -1103,8 +1186,8 @@ export default function ChatWindow({
               handleReaction(showReactionPicker, emojiData.emoji)
               setShowReactionPicker(null)
             }}
-            width={250}
-            height={300}
+            width={pickerDimensions.width}
+            height={pickerDimensions.height}
             previewConfig={{ showPreview: false }}
             searchDisabled
             skinTonesDisabled
@@ -1211,8 +1294,8 @@ export default function ChatWindow({
             >
               <EmojiPicker
                 onEmojiClick={handleEmojiClick}
-                width={250}
-                height={300}
+                width={pickerDimensions.width}
+                height={pickerDimensions.height}
                 previewConfig={{ showPreview: false }}
                 searchDisabled
                 skinTonesDisabled
