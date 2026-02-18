@@ -11,7 +11,8 @@ import {
   faPhoneSlash,
   faExpand,
   faCompress,
-  faUser
+  faUser,
+  faCameraRotate
 } from "@fortawesome/free-solid-svg-icons"
 
 const CALL_STATES = {
@@ -47,6 +48,8 @@ export default function VideoCall({
   const [remoteAudioEnabled, setRemoteAudioEnabled] = useState(true)
   const [isLocalMain, setIsLocalMain] = useState(false)
   const [timeLeft, setTimeLeft] = useState(30) // 30 seconds timeout for incoming calls
+  const [facingMode, setFacingMode] = useState("user")
+  const [hasMultipleCameras, setHasMultipleCameras] = useState(false)
 
   const localVideoRef = useRef(null)
   const remoteVideoRef = useRef(null)
@@ -154,7 +157,7 @@ export default function VideoCall({
           width: { ideal: 640, max: 1280 },
           height: { ideal: 480, max: 720 },
           frameRate: { ideal: 24, max: 30 },
-          facingMode: "user"
+          facingMode: facingMode
         },
         audio: {
           echoCancellation: true,
@@ -498,6 +501,28 @@ export default function VideoCall({
     callDurationRef.current = callDuration
   }, [callDuration])
 
+  // Check for multiple cameras
+  useEffect(() => {
+    const checkCameras = async () => {
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices()
+        const videoDevices = devices.filter(device => device.kind === 'videoinput')
+        setHasMultipleCameras(videoDevices.length > 1)
+        console.log("[VideoCall] Video devices found:", videoDevices.length)
+      } catch (error) {
+        console.error("[VideoCall] Error enumerating devices:", error)
+      }
+    }
+    
+    checkCameras()
+    
+    // Listen for device changes
+    navigator.mediaDevices.addEventListener('devicechange', checkCameras)
+    return () => {
+      navigator.mediaDevices.removeEventListener('devicechange', checkCameras)
+    }
+  }, [])
+
   // End call
   const endCall = () => {
     console.log("[VideoCall] Ending call")
@@ -593,6 +618,61 @@ export default function VideoCall({
       } else {
         console.error("[VideoCall] No video tracks found")
       }
+    }
+  }
+
+  // Toggle camera (front/back)
+  const toggleCamera = async () => {
+    try {
+      const newFacingMode = facingMode === "user" ? "environment" : "user"
+      console.log("[VideoCall] Switching camera to:", newFacingMode)
+      
+      // Get new video stream
+      const newStream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          width: { ideal: 640, max: 1280 },
+          height: { ideal: 480, max: 720 },
+          frameRate: { ideal: 24, max: 30 },
+          facingMode: newFacingMode
+        }
+      })
+      
+      const newVideoTrack = newStream.getVideoTracks()[0]
+      
+      if (localStreamRef.current) {
+        // Stop old video track
+        const oldVideoTrack = localStreamRef.current.getVideoTracks()[0]
+        if (oldVideoTrack) {
+          oldVideoTrack.stop()
+          localStreamRef.current.removeTrack(oldVideoTrack)
+        }
+        
+        // Add new track to local stream
+        localStreamRef.current.addTrack(newVideoTrack)
+        
+        // Update local video element
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = localStreamRef.current
+        }
+        
+        // Replace track in peer connection
+        if (peerConnectionRef.current) {
+          const senders = peerConnectionRef.current.getSenders()
+          const videoSender = senders.find(s => s.track?.kind === "video")
+          
+          if (videoSender) {
+            console.log("[VideoCall] Replacing video track in peer connection")
+            await videoSender.replaceTrack(newVideoTrack)
+          } else {
+             console.log("[VideoCall] No video sender found to replace")
+          }
+        }
+        
+        setFacingMode(newFacingMode)
+        setIsVideoOn(true) // Ensure video is on when switching
+      }
+    } catch (error) {
+      console.error("[VideoCall] Error switching camera:", error)
     }
   }
 
@@ -1236,6 +1316,16 @@ export default function VideoCall({
           >
             <FontAwesomeIcon icon={faPhoneSlash} className="text-white text-lg md:text-xl" />
           </button>
+          
+          {hasMultipleCameras && (
+          <button
+            onClick={toggleCamera}
+            className="p-3 md:p-4 rounded-full bg-gray-800 hover:bg-gray-700 transition-all shadow-lg transform hover:scale-105"
+            title="Switch camera"
+          >
+            <FontAwesomeIcon icon={faCameraRotate} className="text-white text-lg md:text-xl" />
+          </button>
+          )}
         </div>
       </div>
     )
