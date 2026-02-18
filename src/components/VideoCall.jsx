@@ -43,6 +43,9 @@ export default function VideoCall({
   const [isCallAccepted, setIsCallAccepted] = useState(false)
   const [hasRemoteStream, setHasRemoteStream] = useState(false)
   const [remoteVideoReady, setRemoteVideoReady] = useState(false)
+  const [remoteVideoEnabled, setRemoteVideoEnabled] = useState(true)
+  const [remoteAudioEnabled, setRemoteAudioEnabled] = useState(true)
+  const [isLocalMain, setIsLocalMain] = useState(false)
   const [timeLeft, setTimeLeft] = useState(30) // 30 seconds timeout for incoming calls
 
   const localVideoRef = useRef(null)
@@ -131,6 +134,8 @@ export default function VideoCall({
     setIsCallAccepted(false)
     setHasRemoteStream(false)
     setRemoteVideoReady(false)
+    setRemoteVideoEnabled(true)
+    setRemoteAudioEnabled(true)
     iceCandidatesQueueRef.current = []
     remoteDescriptionSetRef.current = false
   }
@@ -541,15 +546,23 @@ export default function VideoCall({
       
       if (audioTracks.length > 0) {
         audioTracks.forEach((track) => {
-          track.enabled = newMuteState
+          track.enabled = !newMuteState // If muted (true), enabled should be false
           console.log(`[VideoCall] Audio track ${track.id} enabled: ${track.enabled}`)
         })
         
-        setIsMuted(!isMuted)
-
+        setIsMuted(newMuteState)
+        
+        // Notify other user
+        const otherUserId = isCallInitiator ? getUserId(otherUser) : incomingCallData?.callerId
+        if (socket && otherUserId) {
+           socket.emit("call:toggle-media", {
+             toUserId: otherUserId,
+             type: 'audio',
+             enabled: !newMuteState
+           })
+        }
       } else {
         console.error("[VideoCall] No audio tracks found")
-
       }
     }
   }
@@ -566,11 +579,19 @@ export default function VideoCall({
           console.log(`[VideoCall] Video track ${track.id} enabled: ${track.enabled}`)
         })
         
-        setIsVideoOn(!isVideoOn)
+        setIsVideoOn(newVideoState)
 
+        // Notify other user
+        const otherUserId = isCallInitiator ? getUserId(otherUser) : incomingCallData?.callerId
+        if (socket && otherUserId) {
+           socket.emit("call:toggle-media", {
+             toUserId: otherUserId,
+             type: 'video',
+             enabled: newVideoState
+           })
+        }
       } else {
         console.error("[VideoCall] No video tracks found")
-
       }
     }
   }
@@ -881,7 +902,17 @@ export default function VideoCall({
     socket.on("call:accepted-notification", handleCallAccepted)
     socket.on("call:rejected", handleCallRejected)
     socket.on("call:ended", handleCallEnded)
+    socket.on("call:ended", handleCallEnded)
     socket.on("ice-candidate", handleIceCandidate)
+    
+    socket.on("call:toggle-media", ({ type, enabled }) => {
+      console.log(`[VideoCall] Peer toggled ${type} to ${enabled}`)
+      if (type === 'video') {
+        setRemoteVideoEnabled(enabled)
+      } else if (type === 'audio') {
+        setRemoteAudioEnabled(enabled)
+      }
+    })
 
     socket.on("call:user-offline", (data) => {
       console.log("[VideoCall] User offline:", data)
@@ -901,7 +932,9 @@ export default function VideoCall({
       socket.off("call:accepted-notification", handleCallAccepted)
       socket.off("call:rejected", handleCallRejected)
       socket.off("call:ended", handleCallEnded)
+      socket.off("call:ended", handleCallEnded)
       socket.off("ice-candidate", handleIceCandidate)
+      socket.off("call:toggle-media")
       socket.off("call:user-offline")
       socket.off("call:busy")
     }
@@ -1037,7 +1070,22 @@ export default function VideoCall({
         )}
 
         {/* Remote video - main display */}
-        <div className="flex-1 relative bg-black flex items-center justify-center overflow-hidden">
+        {/* Video Containers (Swappable) */}
+        
+        {/* Remote Video Container */}
+        <div 
+          onClick={() => isLocalMain && setIsLocalMain(false)}
+          className={
+            !isLocalMain 
+              ? "flex-1 relative bg-black flex items-center justify-center overflow-hidden" // Full Screen (Default)
+              : `absolute z-20 cursor-pointer transition-all duration-300 ease-in-out
+                 ${isFullScreen 
+                   ? 'bottom-6 right-6 w-32 h-42 md:w-40 md:h-52' 
+                   : 'bottom-3 right-3 w-20 h-26 sm:w-24 sm:h-32 md:w-28 md:h-36'
+                 } 
+                 bg-black border-2 md:border-3 border-gray-800 rounded-lg md:rounded-xl overflow-hidden shadow-2xl` // PIP
+          }
+        >
           {callState === CALL_STATES.CONNECTED && hasRemoteStream ? (
             <div className="relative w-full h-full">
               <video
@@ -1073,7 +1121,7 @@ export default function VideoCall({
               )}
             </div>
           ) : (
-            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-900 to-black">
+             <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-900 to-black">
               <div className="text-center">
                 <div className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white text-4xl md:text-5xl font-bold mx-auto mb-4">
                   {otherUser.username?.[0]?.toUpperCase()}
@@ -1092,16 +1140,43 @@ export default function VideoCall({
               </div>
             </div>
           )}
+          
+          {/* Remote Video Disabled Placeholder */}
+          {callState === CALL_STATES.CONNECTED && !remoteVideoEnabled && (
+             <div className="absolute inset-0 z-20 flex items-center justify-center bg-gray-900">
+                <div className="text-center">
+                  <div className="w-24 h-24 md:w-32 md:h-32 rounded-full bg-gradient-to-br from-gray-700 to-gray-600 flex items-center justify-center text-white text-4xl md:text-5xl font-bold mx-auto mb-4 border-4 border-gray-500">
+                    {otherUser.username?.[0]?.toUpperCase()}
+                  </div>
+                  <p className="text-white font-semibold text-lg md:text-xl">{otherUser.username}</p>
+                  <p className="text-gray-400 text-sm mt-2">Camera is off</p>
+                </div>
+             </div>
+          )}
+          
+          {/* Call duration (Only show on remote main view or if local is main, need logic) */}
+          {/* Actually, it's simpler to just show duration on whichever is main, or always floating center top */}
+          {callState === CALL_STATES.CONNECTED && !isLocalMain && (
+            <div className="absolute top-3 left-1/2 transform -translate-x-1/2 bg-black/80 px-4 py-2 md:px-6 md:py-3 rounded-full backdrop-blur-sm z-30">
+              <p className="text-white font-bold text-base md:text-lg">{formatTime(callDuration)}</p>
+            </div>
+          )}
+        </div>
 
-          {/* Local video - small corner window */}
-          <div className={`
-            absolute 
-            ${isFullScreen 
-              ? 'bottom-6 right-6 w-32 h-42 md:w-40 md:h-52' 
-              : 'bottom-3 right-3 w-20 h-26 sm:w-24 sm:h-32 md:w-28 md:h-36'
-            } 
-            bg-black border-2 md:border-3 border-gray-800 rounded-lg md:rounded-xl overflow-hidden shadow-2xl
-          `}>
+        {/* Local Video Container */}
+        <div 
+          onClick={() => !isLocalMain && setIsLocalMain(true)}
+          className={
+            isLocalMain 
+             ? "flex-1 relative bg-black flex items-center justify-center overflow-hidden" // Full Screen (local became main)
+             : `absolute z-20 cursor-pointer transition-all duration-300 ease-in-out
+                ${isFullScreen 
+                  ? 'bottom-6 right-6 w-32 h-42 md:w-40 md:h-52' 
+                  : 'bottom-3 right-3 w-20 h-26 sm:w-24 sm:h-32 md:w-28 md:h-36'
+                } 
+                bg-black border-2 md:border-3 border-gray-800 rounded-lg md:rounded-xl overflow-hidden shadow-2xl` // PIP (Default)
+          }
+        >
             <video
               ref={localVideoRef}
               autoPlay
@@ -1118,17 +1193,16 @@ export default function VideoCall({
                 console.error("[VideoCall] Local video error:", e)
               }}
             />
-            <div className="absolute bottom-1 left-1 md:bottom-2 md:left-2 bg-black/80 px-2 py-1 rounded text-xs text-white font-semibold">
-              {isMuted ? "🔇" : ""} {!isVideoOn ? "📷 Off" : ""}
+            <div className="absolute bottom-1 left-1 md:bottom-2 md:left-2 bg-black/0 px-2 py-1 rounded text-xs text-white font-semibold">
+              {/* Removed overlay status */}
             </div>
-          </div>
-
-          {/* Call duration */}
-          {callState === CALL_STATES.CONNECTED && (
-            <div className="absolute top-3 left-1/2 transform -translate-x-1/2 bg-black/80 px-4 py-2 md:px-6 md:py-3 rounded-full backdrop-blur-sm">
-              <p className="text-white font-bold text-base md:text-lg">{formatTime(callDuration)}</p>
-            </div>
-          )}
+            
+            {/* Show duration if local is main */}
+            {callState === CALL_STATES.CONNECTED && isLocalMain && (
+                <div className="absolute top-3 left-1/2 transform -translate-x-1/2 bg-black/80 px-4 py-2 md:px-6 md:py-3 rounded-full backdrop-blur-sm z-30">
+                  <p className="text-white font-bold text-base md:text-lg">{formatTime(callDuration)}</p>
+                </div>
+            )}
         </div>
 
         {/* Controls - Fixed responsive bottom bar */}

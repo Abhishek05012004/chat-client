@@ -731,7 +731,8 @@ export default function ChatWindow({
       const windowWidth = window.innerWidth
       
       const isMobile = windowWidth < 640
-      const pickerWidth = isMobile ? Math.min(windowWidth - 20, 350) : 350
+      // Reduced width and more padding for mobile as requested
+      const pickerWidth = isMobile ? Math.min(windowWidth - 40, 320) : 350
       
       let top = 0
       let left = 0
@@ -783,7 +784,8 @@ export default function ChatWindow({
       const windowWidth = window.innerWidth
       
       const isMobile = windowWidth < 640
-      const pickerWidth = isMobile ? Math.min(windowWidth - 20, 300) : 300
+      // Reduced width and more padding for mobile as requested
+      const pickerWidth = isMobile ? Math.min(windowWidth - 40, 300) : 300
       
       let top = 0
       let left = 0
@@ -1129,11 +1131,19 @@ export default function ChatWindow({
 
                                 {showDeleteMenu === message._id && (
                                   <div
-                                    className={`absolute ${deleteMenuPosition === 'up' ? 'bottom-full mb-1' : 'top-full mt-1'} ${isOwn ? 'right-0 origin-top-right' : 'left-0 origin-top-left'} bg-white border border-gray-100 rounded-lg shadow-xl z-50 w-48 overflow-hidden py-1 ring-1 ring-black/5 mx-2 md:mx-0`}
+                                    className={`absolute ${deleteMenuPosition === 'up' ? 'bottom-full mb-1' : 'top-full mt-1'} 
+                                      ${isOwn 
+                                        ? 'right-0 origin-top-right md:right-0 md:left-auto md:origin-top-right' 
+                                        : 'left-0 origin-top-left md:left-0 md:right-auto md:origin-top-left'
+                                      } 
+                                      bg-white border border-gray-100 rounded-lg shadow-xl z-50 overflow-hidden py-1 ring-1 ring-black/5 mx-0
+                                      w-32 md:w-48
+                                      ${/* On mobile, shift if needed to stay on screen, but simpler to just align inwards */ ''}
+                                      ${!isOwn ? 'right-0 left-auto origin-top-right md:left-0 md:right-auto md:origin-top-left' : ''}
+                                      ${isOwn ? 'left-0 right-auto origin-top-left md:right-0 md:left-auto md:origin-top-right' : ''}
+                                    `}
                                     style={{
-                                      right: isOwn ? 0 : 'auto',
-                                      left: isOwn ? 'auto' : 0,
-                                      // Ensure it doesn't go off screen on mobile
+                                      // Override base classes for specific mobile constraints if needed via inline styles
                                       maxWidth: 'calc(100vw - 40px)' 
                                     }}
                                   >
