@@ -36,6 +36,7 @@ export default function ChatApp() {
   const [unreadRequests, setUnreadRequests] = useState(0);
   const [callTimers, setCallTimers] = useState({});
   const [isVideoCallActive, setIsVideoCallActive] = useState(false);
+  const [requestsTab, setRequestsTab] = useState("received");
 
   useEffect(() => {
     if (user) {
@@ -46,11 +47,22 @@ export default function ChatApp() {
       socketInstance.on("friend-request-received", (data) => {
         if (data.receiverId === user.id) {
           setUnreadRequests(prev => prev + 1);
+          setRequestsTab("received");
         }
       });
 
       socketInstance.on("friend-request-accepted", (data) => {
+        if (data.senderId === user.id) {
+          setUnreadRequests(prev => prev + 1);
+          setRequestsTab("sent");
+        }
+      });
 
+      socketInstance.on("friend-request-rejected", (data) => {
+        if (data.senderId === user.id) {
+          setUnreadRequests(prev => prev + 1);
+          setRequestsTab("sent");
+        }
       });
 
       socketInstance.on("user-profile-updated", (data) => {
@@ -371,6 +383,7 @@ export default function ChatApp() {
               onOpenProfile={handleOpenProfile} 
               onRequestHandled={() => setUnreadRequests(prev => Math.max(0, prev - 1))}
               socket={socket}
+              initialTab={requestsTab}
             />
           ) : (
             <UserList

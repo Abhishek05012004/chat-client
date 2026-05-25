@@ -142,6 +142,8 @@ export default function UserList({ selectedChat, onSelectChat, socket, onOpenPro
         setUsers(response.data.users)
         
         try {
+          const friendsRes = await api.get("/api/friends")
+          setFriends(friendsRes.data.friends)
           const receivedRes = await api.get("/api/friends/requests/received")
           setReceivedRequests(receivedRes.data.friendRequests)
           const sentRes = await api.get("/api/friends/requests/sent")
@@ -432,8 +434,8 @@ export default function UserList({ selectedChat, onSelectChat, socket, onOpenPro
                 {activeTab === "users" && filteredData.map((user) => {
                   const isLoading = actionLoading[user._id]
                   const isFriend = friends.some((f) => String(f._id) === String(user._id))
-                  const isSentPending = sentRequests.some((r) => r.receiver && String(r.receiver._id) === String(user._id))
-                  const isReceivedPending = receivedRequests.some((r) => r.sender && String(r.sender._id) === String(user._id))
+                  const isSentPending = sentRequests.some((r) => r.receiver && String(r.receiver._id) === String(user._id) && r.status === "pending")
+                  const isReceivedPending = receivedRequests.some((r) => r.sender && String(r.sender._id) === String(user._id) && r.status === "pending")
 
                   return (
                     <div 

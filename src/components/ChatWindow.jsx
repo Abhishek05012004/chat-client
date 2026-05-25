@@ -42,6 +42,20 @@ import {
   faFolder
 } from "@fortawesome/free-solid-svg-icons"
 
+const getCallDisplayContent = (content) => {
+  if (!content) return "";
+  if (content.toLowerCase().startsWith("video call for ")) {
+    return content.substring("video call for ".length);
+  }
+  if (content.toLowerCase().startsWith("video call - ")) {
+    return content.substring("video call - ".length);
+  }
+  if (content.toLowerCase() === "video call rejected") {
+    return "Rejected";
+  }
+  return content;
+}
+
 export default function ChatWindow({
   chat,
   socket,
@@ -749,10 +763,12 @@ export default function ChatWindow({
 
   const handleCallLog = async (chatId, callStatus, callerId, durationInSeconds) => {
     try {
+      const startTime = Date.now() - (durationInSeconds || 0) * 1000
       const response = await api.post(`/api/chats/${chatId}/call-log`, {
         callStatus,
         callerId,
         durationInSeconds: durationInSeconds ?? undefined,
+        startTime,
       })
       const newMessage = { ...response.data.message, chatId }
       setMessages((prev) => {
@@ -981,7 +997,7 @@ export default function ChatWindow({
 
   const selectedMessageObjects = selectedMessages.map(id => messages.find(msg => msg._id === id)).filter(Boolean)
   const hasDownloadable = selectedMessages.length > 0 && selectedMessageObjects.every(m => m.attachments && m.attachments.length > 0)
-  const hasText = selectedMessages.length > 0 && selectedMessageObjects.every(m => (!m.attachments || m.attachments.length === 0) && m.type !== "call" && m.content && m.content.trim().length > 0)
+  const hasText = selectedMessages.length > 0 && selectedMessageObjects.every(m => (!m.attachments || m.attachments.length === 0) && m.type !== "call" && !m.isDeletedForAll && m.content && m.content.trim().length > 0)
 
   return (
     <div className="flex flex-col h-full bg-white relative">
@@ -1221,15 +1237,23 @@ export default function ChatWindow({
                             }`}
                           >
                             {isCallMessage ? (
-                              <div className="flex items-center gap-3 py-1">
-                                <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
-                                  <FontAwesomeIcon icon={faVideo} className="text-gray-600 text-lg" />
+                              <div className="flex items-center gap-3 py-1 min-w-[145px]">
+                                <div className="w-10 h-10 bg-gray-100/60 rounded-full flex items-center justify-center flex-shrink-0">
+                                  <FontAwesomeIcon icon={faVideo} className="text-gray-600 text-base" />
                                 </div>
-                                <div className="flex-1">
-                                    <p className="font-semibold text-sm text-gray-800">Video Call</p>
-                                    <p className="text-xs text-gray-500 text-sm break-words whitespace-pre-wrap flex-1">
-                                      {message.content}
+                                <div className="flex-1 min-w-0 pr-1">
+                                  <p className="font-semibold text-sm text-gray-800">Video Call</p>
+                                  <div className="flex justify-between items-end gap-3 mt-0.5">
+                                    <p className="text-xs text-gray-500 break-words whitespace-pre-wrap">
+                                      {getCallDisplayContent(message.content)}
                                     </p>
+                                    <span className="text-[10px] text-gray-500 min-w-fit select-none">
+                                      {new Date(message.createdAt).toLocaleTimeString([], {
+                                        hour: "2-digit",
+                                        minute: "2-digit",
+                                      })}
+                                    </span>
+                                  </div>
                                 </div>
                               </div>
                             ) : message.isDeletedForAll ? (
@@ -1336,13 +1360,15 @@ export default function ChatWindow({
                               : "right-0 translate-x-full pl-2"} opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex items-center`}
                           >
                             <div className="bg-white/90 backdrop-blur-sm border border-gray-100 rounded-lg shadow-sm flex items-center p-0.5 gap-0.5">
-                              <button
-                                onClick={(e) => handleToggleReactionPicker(message._id, e)}
-                                className="p-1 hover:bg-gray-100 rounded transition-colors text-gray-500 hover:text-yellow-500"
-                                title="React"
-                              >
-                                <FontAwesomeIcon icon={faSmile} className="text-xs" />
-                              </button>
+                              {!message.isDeletedForAll && (
+                                <button
+                                  onClick={(e) => handleToggleReactionPicker(message._id, e)}
+                                  className="p-1 hover:bg-gray-100 rounded transition-colors text-gray-500 hover:text-yellow-500"
+                                  title="React"
+                                >
+                                  <FontAwesomeIcon icon={faSmile} className="text-xs" />
+                                </button>
+                              )}
 
                               <div ref={deleteMenuRef} className="relative">
                                   <button

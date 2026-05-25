@@ -17,12 +17,18 @@ import {
   faUserClock
 } from "@fortawesome/free-solid-svg-icons"
 
-export default function FriendRequests({ onOpenProfile, onRequestHandled, searchQuery = "", socket }) {
+export default function FriendRequests({ onOpenProfile, onRequestHandled, searchQuery = "", socket, initialTab }) {
   const [receivedRequests, setReceivedRequests] = useState([])
   const [sentRequests, setSentRequests] = useState([])
-  const [activeTab, setActiveTab] = useState("received")
+  const [activeTab, setActiveTab] = useState(initialTab || "received")
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState({})
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab)
+    }
+  }, [initialTab])
 
   useEffect(() => {
     fetchRequests()
@@ -235,7 +241,7 @@ export default function FriendRequests({ onOpenProfile, onRequestHandled, search
                                 </div>
                                 <div className="flex items-center gap-2 mt-1">
                                   <span className="text-xs text-gray-400">
-                                    Sent {new Date(request.createdAt).toLocaleDateString()}
+                                    Sent {new Date(request.createdAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
                                   </span>
                                 </div>
                               </div>
@@ -370,7 +376,7 @@ export default function FriendRequests({ onOpenProfile, onRequestHandled, search
                                 </div>
                                 <div className="flex items-center gap-2 mt-1">
                                   <span className="text-xs text-gray-400">
-                                    Sent {new Date(request.createdAt).toLocaleDateString()}
+                                    Sent {new Date(request.createdAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
                                   </span>
                                 </div>
                               </div>
