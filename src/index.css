@@ -27,3 +27,13 @@
   scrollbar-width: thin;
   scrollbar-color: #cbd5e1 transparent;
 }
+
+/* Force pointer (hand) cursor on all clickable/interactive elements */
+button, 
+a, 
+input[type="submit"], 
+input[type="button"],
+.cursor-pointer,
+[role="button"] {
+  cursor: pointer !important;
+}

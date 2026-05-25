@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useNavigate, Link } from "react-router-dom"
+import { toast } from "react-toastify"
 
 import api from "../utils/api"
 
@@ -9,6 +10,7 @@ export default function Register() {
   const navigate = useNavigate()
   const [step, setStep] = useState(1)
   const [userId, setUserId] = useState(null)
+  const [error, setError] = useState("")
   const [formData, setFormData] = useState({
     username: "",
     email: "",
@@ -18,15 +20,20 @@ export default function Register() {
     confirmPassword: "",
   })
   const [loading, setLoading] = useState(false)
+  const [resendLoading, setResendLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
+    if (error) {
+      setError("")
+    }
   }
 
   const handleRegister = async (e) => {
     e.preventDefault()
+    setError("")
     setLoading(true)
 
     try {
@@ -38,9 +45,11 @@ export default function Register() {
 
       setUserId(response.data.userId)
       setStep(2)
-
-    } catch (error) {
-
+      toast.success("Registration initiated! OTP has been sent.")
+    } catch (err) {
+      const errorMsg = err.response?.data?.message || "Registration failed. Please check your details."
+      setError(errorMsg)
+      toast.error(errorMsg)
     } finally {
       setLoading(false)
     }
@@ -48,6 +57,7 @@ export default function Register() {
 
   const handleVerifyOTP = async (e) => {
     e.preventDefault()
+    setError("")
     setLoading(true)
 
     try {
@@ -57,37 +67,49 @@ export default function Register() {
       })
 
       setStep(3)
-
-    } catch (error) {
-
+      toast.success("OTP verified successfully!")
+    } catch (err) {
+      const errorMsg = err.response?.data?.message || "Incorrect OTP. Please try again."
+      setError(errorMsg)
+      toast.error(errorMsg)
     } finally {
       setLoading(false)
     }
   }
 
-  const handleResendOTP = async () => {
-    setLoading(true)
+  const handleResendOTP = async (e) => {
+    if (e) {
+      e.preventDefault()
+      e.stopPropagation()
+    }
+    setError("")
+    setResendLoading(true)
 
     try {
       await api.post("/api/auth/resend-otp", { userId })
-
-    } catch (error) {
-
+      toast.success("OTP resent successfully!")
+    } catch (err) {
+      const errorMsg = err.response?.data?.message || "Failed to resend OTP. Please try again."
+      setError(errorMsg)
+      toast.error(errorMsg)
     } finally {
-      setLoading(false)
+      setResendLoading(false)
     }
   }
 
   const handleSetPassword = async (e) => {
     e.preventDefault()
+    setError("")
 
     if (formData.password !== formData.confirmPassword) {
-
+      setError("Passwords do not match")
+      toast.error("Passwords do not match")
       return
     }
 
     if (formData.password.length < 6) {
-
+      setError("Password must be at least 6 characters")
+      toast.error("Password must be at least 6 characters")
       return
     }
 
@@ -99,10 +121,12 @@ export default function Register() {
         password: formData.password,
       })
 
-
+      toast.success("Password set successfully! Redirecting to login...")
       setTimeout(() => navigate("/login"), 2000)
-    } catch (error) {
-
+    } catch (err) {
+      const errorMsg = err.response?.data?.message || "Failed to set password."
+      setError(errorMsg)
+      toast.error(errorMsg)
     } finally {
       setLoading(false)
     }
@@ -161,6 +185,14 @@ export default function Register() {
 
           {/* Form Section */}
           <div className="p-6 md:p-8">
+            {error && (
+              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3 animate-fade-in text-left">
+                <div className="flex-shrink-0 w-5 h-5 bg-red-100 rounded-full flex items-center justify-center mt-0.5">
+                  <i className="fas fa-exclamation-circle text-red-600 text-xs"></i>
+                </div>
+                <p className="text-red-700 text-sm font-medium flex-1">{error}</p>
+              </div>
+            )}
             {/* Step 1: Register */}
             {step === 1 && (
               <form onSubmit={handleRegister} className="space-y-5">
@@ -301,11 +333,20 @@ export default function Register() {
                   <button
                     type="button"
                     onClick={handleResendOTP}
-                    disabled={loading}
-                    className="text-indigo-600 hover:text-indigo-700 font-medium text-sm transition-colors inline-flex items-center gap-1"
+                    disabled={resendLoading}
+                    className="text-indigo-600 hover:text-indigo-700 font-medium text-sm transition-colors inline-flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <i className="fas fa-redo-alt"></i>
-                    <span>Resend OTP</span>
+                    {resendLoading ? (
+                      <>
+                        <i className="fas fa-spinner fa-spin"></i>
+                        <span>Resending...</span>
+                      </>
+                    ) : (
+                      <>
+                        <i className="fas fa-redo-alt"></i>
+                        <span>Resend OTP</span>
+                      </>
+                    )}
                   </button>
                   <p className="text-gray-500 text-xs mt-2">Didn't receive the code? Check spam folder</p>
                 </div>
@@ -420,21 +461,19 @@ export default function Register() {
             </div>
           </div>
 
-          {/* Footer */}
-          <div className="bg-gray-50 px-6 md:px-8 py-4 border-t border-gray-200">
-            <p className="text-center text-xs text-gray-500">
-              By registering, you agree to our{" "}
-              <a href="#" className="text-indigo-600 hover:text-indigo-700 font-medium">
-                Terms
-              </a>{" "}
-              and{" "}
-              <a href="#" className="text-indigo-600 hover:text-indigo-700 font-medium">
-                Privacy Policy
-              </a>
-            </p>
-          </div>
         </div>
       </div>
+      
+      {/* Add these styles for animations */}
+      <style jsx>{`
+        @keyframes fade-in {
+          from { opacity: 0; transform: translateY(-10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in {
+          animation: fade-in 0.3s ease-out;
+        }
+      `}</style>
     </div>
   )
 }

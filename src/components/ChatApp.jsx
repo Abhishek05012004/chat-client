@@ -14,7 +14,9 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { 
   faFolder, 
   faComments, 
-  faUserFriends, 
+  faComment,
+  faUserFriends,
+  faUserPlus,
   faSignOutAlt, 
   faVideo,
   faPhone,
@@ -33,6 +35,7 @@ export default function ChatApp() {
   const [showGlobalCallScreen, setShowGlobalCallScreen] = useState(false);
   const [unreadRequests, setUnreadRequests] = useState(0);
   const [callTimers, setCallTimers] = useState({});
+  const [isVideoCallActive, setIsVideoCallActive] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -40,13 +43,10 @@ export default function ChatApp() {
       setSocket(socketInstance);
       window.socketInstance = socketInstance;
 
-      socketInstance.on("user-status-changed", (data) => {
-        console.log("User status changed:", data);
-      });
-
-        socketInstance.on("friend-request-received", (data) => {
-
-        setUnreadRequests(prev => prev + 1);
+      socketInstance.on("friend-request-received", (data) => {
+        if (data.receiverId === user.id) {
+          setUnreadRequests(prev => prev + 1);
+        }
       });
 
       socketInstance.on("friend-request-accepted", (data) => {
@@ -149,6 +149,25 @@ export default function ChatApp() {
       };
     }
   }, [user]);
+
+  useEffect(() => {
+    const handleStartVideoCallWithUser = async (e) => {
+      const { userId } = e.detail;
+      try {
+        const api = (await import("../utils/api")).default;
+        const response = await api.post("/api/chats/create", { userId });
+        setSelectedChat(response.data.chat);
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent("start-video-call", { detail: { chatId: response.data.chat._id } }));
+        }, 300);
+      } catch (err) {
+        console.error("Error starting video call:", err);
+      }
+    };
+
+    window.addEventListener("start-video-call-with-user", handleStartVideoCallWithUser);
+    return () => window.removeEventListener("start-video-call-with-user", handleStartVideoCallWithUser);
+  }, []);
 
   const handleLogout = () => {
     // Clear all call timers
@@ -288,17 +307,18 @@ export default function ChatApp() {
       {/* Sidebar */}
       <div
         className={`
-          ${selectedChat ? "hidden md:flex" : "flex w-full"}
-          md:w-96 bg-white border-r border-gray-200 flex-col transition-all duration-300
+          ${selectedChat ? (isVideoCallActive ? "hidden xl:flex" : "hidden md:flex") : "flex w-full"}
+          ${isVideoCallActive ? "xl:w-96" : "md:w-96"} bg-white border-r border-gray-200 flex-col transition-all duration-300
+          ${isVideoCallActive ? "pointer-events-none opacity-50 select-none" : ""}
         `}
       >
         {/* Header */}
         <div className="bg-gray-50 p-4 border-b border-gray-200 flex items-center justify-between sticky top-0 z-10 h-16 shadow-sm">
-          <div
-            className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition"
-            onClick={() => handleOpenProfile(user.id, true)}
-          >
-            <div className="relative">
+          <div className="flex items-center gap-3 p-2 rounded-lg">
+            <div 
+              className="relative cursor-pointer hover:opacity-85 transition"
+              onClick={() => handleOpenProfile(user.id, true)}
+            >
               {user?.profileImage && user.profileImage !== "" ? (
                 <img
                   src={user.profileImage || "/placeholder.svg"}
@@ -324,25 +344,15 @@ export default function ChatApp() {
              <button
                onClick={handleToggleFriendRequests}
                className={`p-2 rounded-full hover:bg-gray-100 transition relative ${showFriendRequests ? "text-indigo-600 bg-indigo-50" : "text-gray-600"}`}
-               title="Friend Requests"
+               title={showFriendRequests ? "Back to Chats" : "Friend Requests"}
              >
-               <FontAwesomeIcon icon={faUserFriends} />
+               <FontAwesomeIcon icon={showFriendRequests ? faComment : faUserPlus} />
                {unreadRequests > 0 && (
                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center border-2 border-white">
                    {unreadRequests}
                  </span>
                )}
              </button>
-             
-             {selectedChat && (
-              <button
-                onClick={() => setShowMediaGallery(true)}
-                className="p-2 rounded-full hover:bg-gray-100 text-gray-600 transition"
-                title="Shared Media"
-              >
-                <FontAwesomeIcon icon={faFolder} />
-              </button>
-             )}
 
              <button
                onClick={handleLogout}
@@ -360,6 +370,7 @@ export default function ChatApp() {
             <FriendRequests 
               onOpenProfile={handleOpenProfile} 
               onRequestHandled={() => setUnreadRequests(prev => Math.max(0, prev - 1))}
+              socket={socket}
             />
           ) : (
             <UserList
@@ -375,7 +386,7 @@ export default function ChatApp() {
       {/* Chat Area */}
       <div
         className={`
-          ${selectedChat ? "fixed inset-0 z-50 md:static md:flex" : "hidden md:flex"}
+          ${selectedChat ? (isVideoCallActive ? "fixed inset-0 z-50 xl:static xl:flex" : "fixed inset-0 z-50 md:static md:flex") : "hidden md:flex"}
           flex-1 flex-col bg-white transition-all duration-300
         `}
       >
@@ -390,6 +401,8 @@ export default function ChatApp() {
             setGlobalIncomingCall={setGlobalIncomingCall}
             setShowGlobalCallScreen={setShowGlobalCallScreen}
             onBack={handleBackToChats}
+            onShowMedia={() => setShowMediaGallery(true)}
+            onVideoCallStateChange={setIsVideoCallActive}
           />
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center bg-gradient-to-br from-gray-50 to-white p-4">
@@ -407,23 +420,22 @@ export default function ChatApp() {
               </div>
               
               <h2 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-3">
-                Welcome to MERN Chat
+                Welcome
               </h2>
               <p className="text-gray-600 text-sm sm:text-base mb-6">
-                Select a friend from the sidebar to start chatting, 
-                make video calls, and share files securely.
+                Select a friend from the sidebar to start messaging and make video calls.
               </p>
               
               <div className="grid grid-cols-2 gap-3 mb-6">
                 <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
-                  <FontAwesomeIcon icon={faVideo} className="text-indigo-600 text-lg mb-2" />
-                  <h3 className="font-semibold text-gray-800 text-sm">Video Calls</h3>
-                  <p className="text-xs text-gray-500">HD quality calls</p>
+                  <FontAwesomeIcon icon={faComments} className="text-indigo-600 text-lg mb-2" />
+                  <h3 className="font-semibold text-gray-800 text-sm">Real-time Chat</h3>
+                  <p className="text-xs text-gray-500">Message instantly</p>
                 </div>
                 <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
-                  <FontAwesomeIcon icon={faPhone} className="text-green-600 text-lg mb-2" />
-                  <h3 className="font-semibold text-gray-800 text-sm">Secure Chat</h3>
-                  <p className="text-xs text-gray-500">End-to-end encrypted</p>
+                  <FontAwesomeIcon icon={faVideo} className="text-green-600 text-lg mb-2" />
+                  <h3 className="font-semibold text-gray-800 text-sm">Video Calls</h3>
+                  <p className="text-xs text-gray-500">Connect face-to-face</p>
                 </div>
               </div>
               

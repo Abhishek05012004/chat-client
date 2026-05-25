@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react"
 import api from "../utils/api"
 
 import { useAuth } from "../context/AuthContext"
+import { toast } from "react-toastify"
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome"
 import { 
   faTimes, 
@@ -121,7 +122,7 @@ export default function ProfileModal({ isOpen, onClose, userId, isOwnProfile }) 
   const handleCopyToClipboard = (text) => {
     if (text) {
       navigator.clipboard.writeText(text)
-
+      alert("Copied to clipboard!")
     }
   }
 
@@ -135,18 +136,12 @@ export default function ProfileModal({ isOpen, onClose, userId, isOwnProfile }) 
 
   const handleVideoCall = () => {
     if (profile && window.socketInstance) {
-
+      if (profile.status !== "online") {
+        alert("Video call can't be done, user is offline")
+        return
+      }
       
-      window.socketInstance.emit("video-call-initiate", {
-        callerId: currentUser.id,
-        callerName: currentUser.username,
-        callerProfile: {
-          profileImage: currentUser.profileImage,
-        },
-        receiverId: profile._id,
-        receiverName: profile.username,
-        callType: "video"
-      })
+      window.dispatchEvent(new CustomEvent("start-video-call-with-user", { detail: { userId: profile._id } }))
       
       onClose()
     }
@@ -231,15 +226,6 @@ export default function ProfileModal({ isOpen, onClose, userId, isOwnProfile }) 
                         </div>
                       </div>
                     </div>
-                    
-                    {/* Status Indicator */}
-                    <div className="absolute bottom-2 right-2">
-                      <div className={`w-4 h-4 sm:w-5 sm:h-5 rounded-full border-2 border-white ${
-                        profile && profile.status === "online" 
-                          ? "bg-green-500 animate-pulse" 
-                          : "bg-gray-400"
-                      }`}></div>
-                    </div>
                   </div>
 
                   {/* Edit Photo Button */}
@@ -305,24 +291,26 @@ export default function ProfileModal({ isOpen, onClose, userId, isOwnProfile }) 
               {/* Profile Info Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                 {/* Email */}
-                <div className="bg-gradient-to-br from-gray-50 to-white p-3 sm:p-4 rounded-xl border border-gray-200">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2 text-gray-600">
-                      <FontAwesomeIcon icon={faEnvelope} className="text-sm" />
-                      <span className="text-xs font-semibold uppercase">Email</span>
+                {isOwnProfile && (
+                  <div className="bg-gradient-to-br from-gray-50 to-white p-3 sm:p-4 rounded-xl border border-gray-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2 text-gray-600">
+                        <FontAwesomeIcon icon={faEnvelope} className="text-sm" />
+                        <span className="text-xs font-semibold uppercase">Email</span>
+                      </div>
+                      <button
+                        onClick={() => handleCopyToClipboard(profile ? profile.email : "")}
+                        className="text-xs text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1"
+                      >
+                        <FontAwesomeIcon icon={faExternalLinkAlt} className="text-xs" />
+                        Copy
+                      </button>
                     </div>
-                    <button
-                      onClick={() => handleCopyToClipboard(profile ? profile.email : "")}
-                      className="text-xs text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1"
-                    >
-                      <FontAwesomeIcon icon={faExternalLinkAlt} className="text-xs" />
-                      Copy
-                    </button>
+                    <p className="text-sm sm:text-base text-gray-800 font-medium truncate">
+                      {profile ? profile.email : "Not provided"}
+                    </p>
                   </div>
-                  <p className="text-sm sm:text-base text-gray-800 font-medium truncate">
-                    {profile ? profile.email : "Not provided"}
-                  </p>
-                </div>
+                )}
 
                 {/* Phone */}
                 <div className="bg-gradient-to-br from-gray-50 to-white p-3 sm:p-4 rounded-xl border border-gray-200">
@@ -415,30 +403,6 @@ export default function ProfileModal({ isOpen, onClose, userId, isOwnProfile }) 
                 </div>
               </div>
 
-              {/* Stats (for own profile) */}
-              {isOwnProfile && (
-                <div className="mt-4 sm:mt-6">
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
-                    <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-3 rounded-xl text-center border border-blue-200">
-                      <p className="text-lg sm:text-xl font-bold text-blue-600">12</p>
-                      <p className="text-xs text-blue-700 mt-1">Friends</p>
-                    </div>
-                    <div className="bg-gradient-to-br from-green-50 to-green-100 p-3 rounded-xl text-center border border-green-200">
-                      <p className="text-lg sm:text-xl font-bold text-green-600">48</p>
-                      <p className="text-xs text-green-700 mt-1">Chats</p>
-                    </div>
-                    <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-3 rounded-xl text-center border border-purple-200">
-                      <p className="text-lg sm:text-xl font-bold text-purple-600">156</p>
-                      <p className="text-xs text-purple-700 mt-1">Messages</p>
-                    </div>
-                    <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-3 rounded-xl text-center border border-orange-200">
-                      <p className="text-lg sm:text-xl font-bold text-orange-600">7</p>
-                      <p className="text-xs text-orange-700 mt-1">Files</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
               {/* Action Buttons - Updated with icons and functionality */}
               <div className="mt-6 sm:mt-8">
                 {isOwnProfile ? (
@@ -473,13 +437,6 @@ export default function ProfileModal({ isOpen, onClose, userId, isOwnProfile }) 
                         <FontAwesomeIcon icon={faEdit} className="text-sm" />
                         <span className="text-sm">Edit Profile</span>
                       </button>
-                      <button
-                        onClick={() => handleCopyToClipboard(window.location.href)}
-                        className="flex-1 bg-gradient-to-r from-blue-50 to-indigo-50 text-indigo-600 py-3 px-4 rounded-xl hover:from-blue-100 hover:to-indigo-100 transition font-semibold border border-indigo-200 flex items-center justify-center gap-2"
-                      >
-                        <FontAwesomeIcon icon={faShareAlt} className="text-sm" />
-                        <span className="text-sm">Share Profile</span>
-                      </button>
                     </div>
                   )
                 ) : (
@@ -511,13 +468,6 @@ export default function ProfileModal({ isOpen, onClose, userId, isOwnProfile }) 
             </div>
           )}
 
-          {/* Footer */}
-          <div className="mt-6 pt-4 border-t border-gray-200 text-center">
-            <p className="text-xs text-gray-500">
-              Profile ID: {profile && profile._id ? profile._id.substring(0, 8) + "..." : "..."} • 
-              Last updated: {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </p>
-          </div>
         </div>
       </div>
     </div>

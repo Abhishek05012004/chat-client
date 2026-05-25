@@ -171,26 +171,7 @@ export default function Login() {
                 </div>
               </div>
 
-              {/* Remember Me */}
-              <div className="flex items-center">
-                <button
-                  type="button"
-                  onClick={() => setIsRememberMe(!isRememberMe)}
-                  className="flex items-center gap-2 group"
-                  disabled={loading}
-                >
-                  <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all duration-200 ${
-                    isRememberMe 
-                      ? 'bg-indigo-600 border-indigo-600' 
-                      : 'bg-white border-gray-300 group-hover:border-gray-400'
-                  }`}>
-                    {isRememberMe && (
-                      <i className="fas fa-check text-white text-xs"></i>
-                    )}
-                  </div>
-                  <span className="text-sm text-gray-700 select-none">Remember me</span>
-                </button>
-              </div>
+
 
               {/* Submit Button */}
               <button
@@ -227,19 +208,6 @@ export default function Login() {
             </div>
           </div>
 
-          {/* Footer */}
-          <div className="bg-gray-50 px-6 md:px-8 py-4 border-t border-gray-200">
-            <p className="text-center text-xs text-gray-500">
-              By logging in, you agree to our{" "}
-              <a href="#" className="text-indigo-600 hover:text-indigo-700 font-medium">
-                Terms
-              </a>{" "}
-              and{" "}
-              <a href="#" className="text-indigo-600 hover:text-indigo-700 font-medium">
-                Privacy Policy
-              </a>
-            </p>
-          </div>
         </div>
       </div>
 

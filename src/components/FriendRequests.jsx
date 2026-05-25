@@ -17,7 +17,7 @@ import {
   faUserClock
 } from "@fortawesome/free-solid-svg-icons"
 
-export default function FriendRequests({ onOpenProfile, onRequestHandled, searchQuery = "" }) {
+export default function FriendRequests({ onOpenProfile, onRequestHandled, searchQuery = "", socket }) {
   const [receivedRequests, setReceivedRequests] = useState([])
   const [sentRequests, setSentRequests] = useState([])
   const [activeTab, setActiveTab] = useState("received")
@@ -28,19 +28,40 @@ export default function FriendRequests({ onOpenProfile, onRequestHandled, search
     fetchRequests()
   }, [activeTab])
 
+  useEffect(() => {
+    if (socket) {
+      const handleSocketUpdate = () => {
+        fetchRequests()
+      }
+
+      socket.on("friend-request-received", handleSocketUpdate)
+      socket.on("friend-request-sent", handleSocketUpdate)
+      socket.on("friend-request-accepted", handleSocketUpdate)
+      socket.on("friend-request-rejected", handleSocketUpdate)
+      socket.on("friend-request-cancelled", handleSocketUpdate)
+
+      return () => {
+        socket.off("friend-request-received", handleSocketUpdate)
+        socket.off("friend-request-sent", handleSocketUpdate)
+        socket.off("friend-request-accepted", handleSocketUpdate)
+        socket.off("friend-request-rejected", handleSocketUpdate)
+        socket.off("friend-request-cancelled", handleSocketUpdate)
+      }
+    }
+  }, [socket, activeTab])
+
   const fetchRequests = async () => {
     setLoading(true)
     try {
       if (activeTab === "received") {
         const response = await api.get("/api/friends/requests/received")
-        setReceivedRequests(response.data.friendRequests)
+        setReceivedRequests(response.data.friendRequests.map(r => ({ ...r, status: r.status || "pending" })))
       } else {
         const response = await api.get("/api/friends/requests/sent")
-        setSentRequests(response.data.friendRequests)
+        setSentRequests(response.data.friendRequests.map(r => ({ ...r, status: r.status || "pending" })))
       }
     } catch (error) {
       console.error("Fetch requests error:", error)
-
     } finally {
       setLoading(false)
     }
@@ -52,9 +73,12 @@ export default function FriendRequests({ onOpenProfile, onRequestHandled, search
       await api.post(`/api/friends/request/${requestId}/accept`)
 
       if (onRequestHandled) onRequestHandled()
-      fetchRequests()
+      // Locally mark the request as accepted
+      setReceivedRequests(prev =>
+        prev.map(r => r._id === requestId ? { ...r, status: "accepted" } : r)
+      )
     } catch (error) {
-
+      console.error("Accept error:", error)
     } finally {
       setActionLoading({ ...actionLoading, [requestId]: null })
     }
@@ -66,9 +90,12 @@ export default function FriendRequests({ onOpenProfile, onRequestHandled, search
       await api.post(`/api/friends/request/${requestId}/reject`)
 
       if (onRequestHandled) onRequestHandled()
-      fetchRequests()
+      // Locally mark the request as rejected
+      setReceivedRequests(prev =>
+        prev.map(r => r._id === requestId ? { ...r, status: "rejected" } : r)
+      )
     } catch (error) {
-
+      console.error("Reject error:", error)
     } finally {
       setActionLoading({ ...actionLoading, [requestId]: null })
     }
@@ -78,10 +105,9 @@ export default function FriendRequests({ onOpenProfile, onRequestHandled, search
     setActionLoading({ ...actionLoading, [requestId]: 'cancel' })
     try {
       await api.post(`/api/friends/request/${requestId}/cancel`)
-
       fetchRequests()
     } catch (error) {
-
+      console.error("Cancel error:", error)
     } finally {
       setActionLoading({ ...actionLoading, [requestId]: null })
     }
@@ -93,15 +119,19 @@ export default function FriendRequests({ onOpenProfile, onRequestHandled, search
     
     return requests.filter(request => {
       const user = isReceived ? request.sender : request.receiver;
+      if (!user) return false;
       return (
         user.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        user.email.toLowerCase().includes(searchQuery.toLowerCase())
+        (user.email && user.email.toLowerCase().includes(searchQuery.toLowerCase()))
       );
     });
   };
 
   const filteredReceived = filterRequests(receivedRequests, true);
   const filteredSent = filterRequests(sentRequests, false);
+
+  const pendingReceivedCount = receivedRequests.filter(r => r.status === "pending").length;
+  const pendingSentCount = sentRequests.filter(r => r.status === "pending").length;
 
   return (
     <div className="flex flex-col h-full">
@@ -117,9 +147,9 @@ export default function FriendRequests({ onOpenProfile, onRequestHandled, search
         >
           <FontAwesomeIcon icon={faUserPlus} className={activeTab === "received" ? "text-indigo-600" : "text-gray-500"} />
           <span>Received</span>
-          {receivedRequests.length > 0 && (
+          {pendingReceivedCount > 0 && (
             <span className="bg-indigo-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-              {receivedRequests.length}
+              {pendingReceivedCount}
             </span>
           )}
         </button>
@@ -133,9 +163,9 @@ export default function FriendRequests({ onOpenProfile, onRequestHandled, search
         >
           <FontAwesomeIcon icon={faPaperPlane} className={activeTab === "sent" ? "text-indigo-600" : "text-gray-500"} />
           <span>Sent</span>
-          {sentRequests.length > 0 && (
+          {pendingSentCount > 0 && (
             <span className="bg-gray-400 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-              {sentRequests.length}
+              {pendingSentCount}
             </span>
           )}
         </button>
@@ -166,6 +196,7 @@ export default function FriendRequests({ onOpenProfile, onRequestHandled, search
                   <div className="space-y-3">
                     {filteredReceived.map((request) => {
                       const user = request.sender;
+                      if (!user) return null;
                       const isLoading = actionLoading[request._id];
                       
                       return (
@@ -198,20 +229,10 @@ export default function FriendRequests({ onOpenProfile, onRequestHandled, search
                               
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center justify-between mb-1">
-                                  <h3 
-                                    className="font-semibold text-gray-800 truncate text-sm sm:text-base cursor-pointer hover:text-indigo-600 transition-colors"
-                                    onClick={() => onOpenProfile(user._id, false)}
-                                  >
+                                  <h3 className="font-semibold text-gray-800 truncate text-sm sm:text-base">
                                     {user.username}
                                   </h3>
-                                  <span className="text-xs text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
-                                    New Request
-                                  </span>
                                 </div>
-                                <p className="text-xs text-gray-500 truncate flex items-center gap-1">
-                                  <FontAwesomeIcon icon={faEnvelope} className="text-xs" />
-                                  {user.email}
-                                </p>
                                 <div className="flex items-center gap-2 mt-1">
                                   <span className="text-xs text-gray-400">
                                     Sent {new Date(request.createdAt).toLocaleDateString()}
@@ -220,32 +241,44 @@ export default function FriendRequests({ onOpenProfile, onRequestHandled, search
                               </div>
                             </div>
 
-                            {/* Right side - Action buttons */}
+                            {/* Right side - Action buttons / Status */}
                             <div className="flex items-center gap-2 ml-3 flex-shrink-0">
-                              <button
-                                onClick={() => handleAccept(request._id)}
-                                disabled={isLoading}
-                                className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg text-xs sm:text-sm transition-all duration-200 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                              >
-                                {isLoading === 'accept' ? (
-                                  <FontAwesomeIcon icon={faSpinner} className="fa-spin" />
-                                ) : (
-                                  <FontAwesomeIcon icon={faCheck} />
-                                )}
-                                <span>Accept</span>
-                              </button>
-                              <button
-                                onClick={() => handleReject(request._id)}
-                                disabled={isLoading}
-                                className="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg text-xs sm:text-sm transition-all duration-200 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                              >
-                                {isLoading === 'reject' ? (
-                                  <FontAwesomeIcon icon={faSpinner} className="fa-spin" />
-                                ) : (
-                                  <FontAwesomeIcon icon={faTimes} />
-                                )}
-                                <span>Reject</span>
-                              </button>
+                              {request.status === "accepted" ? (
+                                <span className="text-xs font-semibold text-green-600 bg-green-50 border border-green-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
+                                  <FontAwesomeIcon icon={faCheck} /> Accepted
+                                </span>
+                              ) : request.status === "rejected" ? (
+                                <span className="text-xs font-semibold text-red-600 bg-red-50 border border-red-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
+                                  <FontAwesomeIcon icon={faTimes} /> Rejected
+                                </span>
+                              ) : (
+                                <>
+                                  <button
+                                    onClick={() => handleAccept(request._id)}
+                                    disabled={isLoading}
+                                    className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg text-xs sm:text-sm transition-all duration-200 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                  >
+                                    {isLoading === 'accept' ? (
+                                      <FontAwesomeIcon icon={faSpinner} className="fa-spin" />
+                                    ) : (
+                                      <FontAwesomeIcon icon={faCheck} />
+                                    )}
+                                    <span>Accept</span>
+                                  </button>
+                                  <button
+                                    onClick={() => handleReject(request._id)}
+                                    disabled={isLoading}
+                                    className="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg text-xs sm:text-sm transition-all duration-200 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                  >
+                                    {isLoading === 'reject' ? (
+                                      <FontAwesomeIcon icon={faSpinner} className="fa-spin" />
+                                    ) : (
+                                      <FontAwesomeIcon icon={faTimes} />
+                                    )}
+                                    <span>Reject</span>
+                                  </button>
+                                </>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -272,6 +305,7 @@ export default function FriendRequests({ onOpenProfile, onRequestHandled, search
                   <div className="space-y-3">
                     {filteredSent.map((request) => {
                       const user = request.receiver;
+                      if (!user) return null;
                       const isLoading = actionLoading[request._id];
                       
                       return (
@@ -297,28 +331,43 @@ export default function FriendRequests({ onOpenProfile, onRequestHandled, search
                                     {user.username[0].toUpperCase()}
                                   </div>
                                 )}
-                                <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-yellow-500 rounded-full border-2 border-white flex items-center justify-center">
-                                  <FontAwesomeIcon icon={faClock} className="text-white text-xs" />
-                                </div>
+                                {request.status === "accepted" ? (
+                                  <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-green-500 rounded-full border-2 border-white flex items-center justify-center">
+                                    <FontAwesomeIcon icon={faCheck} className="text-white text-xs" />
+                                  </div>
+                                ) : request.status === "rejected" ? (
+                                  <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-red-500 rounded-full border-2 border-white flex items-center justify-center">
+                                    <FontAwesomeIcon icon={faTimes} className="text-white text-xs" />
+                                  </div>
+                                ) : (
+                                  <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-yellow-500 rounded-full border-2 border-white flex items-center justify-center">
+                                    <FontAwesomeIcon icon={faClock} className="text-white text-xs" />
+                                  </div>
+                                )}
                               </div>
                               
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center justify-between mb-1">
-                                  <h3 
-                                    className="font-semibold text-gray-800 truncate text-sm sm:text-base cursor-pointer hover:text-indigo-600 transition-colors"
-                                    onClick={() => onOpenProfile(user._id, false)}
-                                  >
+                                  <h3 className="font-semibold text-gray-800 truncate text-sm sm:text-base">
                                     {user.username}
                                   </h3>
-                                  <span className="text-xs text-yellow-600 bg-yellow-50 px-2 py-0.5 rounded-full flex items-center gap-1">
-                                    <FontAwesomeIcon icon={faClock} className="text-xs" />
-                                    Pending
-                                  </span>
+                                  {request.status === "accepted" ? (
+                                    <span className="text-xs text-green-600 bg-green-50 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                      <FontAwesomeIcon icon={faCheck} className="text-xs" />
+                                      Accepted
+                                    </span>
+                                  ) : request.status === "rejected" ? (
+                                    <span className="text-xs text-red-600 bg-red-50 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                      <FontAwesomeIcon icon={faTimes} className="text-xs" />
+                                      Rejected
+                                    </span>
+                                  ) : (
+                                    <span className="text-xs text-yellow-600 bg-yellow-50 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                      <FontAwesomeIcon icon={faClock} className="text-xs" />
+                                      Pending
+                                    </span>
+                                  )}
                                 </div>
-                                <p className="text-xs text-gray-500 truncate flex items-center gap-1">
-                                  <FontAwesomeIcon icon={faEnvelope} className="text-xs" />
-                                  {user.email}
-                                </p>
                                 <div className="flex items-center gap-2 mt-1">
                                   <span className="text-xs text-gray-400">
                                     Sent {new Date(request.createdAt).toLocaleDateString()}
@@ -329,18 +378,20 @@ export default function FriendRequests({ onOpenProfile, onRequestHandled, search
 
                             {/* Right side - Cancel button */}
                             <div className="flex items-center ml-3 flex-shrink-0">
-                              <button
-                                onClick={() => handleCancel(request._id)}
-                                disabled={isLoading}
-                                className="bg-gray-600 hover:bg-gray-700 text-white px-3 py-2 rounded-lg text-xs sm:text-sm transition-all duration-200 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                              >
-                                {isLoading === 'cancel' ? (
-                                  <FontAwesomeIcon icon={faSpinner} className="fa-spin" />
-                                ) : (
-                                  <FontAwesomeIcon icon={faTimes} />
-                                )}
-                                <span>Cancel</span>
-                              </button>
+                              {request.status === "pending" && (
+                                <button
+                                  onClick={() => handleCancel(request._id)}
+                                  disabled={isLoading}
+                                  className="bg-gray-600 hover:bg-gray-700 text-white px-3 py-2 rounded-lg text-xs sm:text-sm transition-all duration-200 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  {isLoading === 'cancel' ? (
+                                    <FontAwesomeIcon icon={faSpinner} className="fa-spin" />
+                                  ) : (
+                                    <FontAwesomeIcon icon={faTimes} />
+                                  )}
+                                  <span>Cancel</span>
+                                </button>
+                              )}
                             </div>
                           </div>
                         </div>

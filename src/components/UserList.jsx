@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import api from "../utils/api"
+import { toast } from "react-toastify"
 
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome"
 import { 
@@ -13,7 +14,9 @@ import {
   faMessage,
   faUserPlus,
   faEllipsisV,
-  faSpinner
+  faSpinner,
+  faBan,
+  faUserClock
 } from "@fortawesome/free-solid-svg-icons"
 
 export default function UserList({ selectedChat, onSelectChat, socket, onOpenProfile, searchQuery = "" }) {
@@ -25,6 +28,8 @@ export default function UserList({ selectedChat, onSelectChat, socket, onOpenPro
   const [userStatuses, setUserStatuses] = useState({})
   const [typingUsers, setTypingUsers] = useState({})
   const [actionLoading, setActionLoading] = useState({})
+  const [receivedRequests, setReceivedRequests] = useState([])
+  const [sentRequests, setSentRequests] = useState([])
 
   useEffect(() => {
     fetchData()
@@ -76,6 +81,12 @@ export default function UserList({ selectedChat, onSelectChat, socket, onOpenPro
       socket.on("receive-message", handleRefresh)
       socket.on("message-seen-update", handleRefresh)
       socket.on("unread-count-changed", handleRefresh)
+      socket.on("message-deleted", handleRefresh)
+      socket.on("friend-request-received", handleRefresh)
+      socket.on("friend-request-sent", handleRefresh)
+      socket.on("friend-request-accepted", handleRefresh)
+      socket.on("friend-request-rejected", handleRefresh)
+      socket.on("friend-request-cancelled", handleRefresh)
 
       return () => {
         socket.off("user-status-changed", handleUserStatusChanged)
@@ -84,13 +95,23 @@ export default function UserList({ selectedChat, onSelectChat, socket, onOpenPro
         socket.off("receive-message", handleRefresh)
         socket.off("message-seen-update", handleRefresh)
         socket.off("unread-count-changed", handleRefresh)
+        socket.off("message-deleted", handleRefresh)
+        socket.off("friend-request-received", handleRefresh)
+        socket.off("friend-request-sent", handleRefresh)
+        socket.off("friend-request-accepted", handleRefresh)
+        socket.off("friend-request-rejected", handleRefresh)
+        socket.off("friend-request-cancelled", handleRefresh)
       }
     }
   }, [socket, activeTab]) // Added activeTab to dependency to ensure fetchData uses correct tab
 
   const fetchData = async () => {
-    // Don't show full loading spinner for background updates
-    if (users.length === 0 && chats.length === 0 && friends.length === 0) {
+    // Show loading if we are fetching data for a tab that currently has no data
+    if (
+      (activeTab === "chats" && chats.length === 0) ||
+      (activeTab === "friends" && friends.length === 0) ||
+      (activeTab === "users" && users.length === 0)
+    ) {
       setLoading(true)
     }
     
@@ -119,6 +140,15 @@ export default function UserList({ selectedChat, onSelectChat, socket, onOpenPro
       } else {
         const response = await api.get("/api/users")
         setUsers(response.data.users)
+        
+        try {
+          const receivedRes = await api.get("/api/friends/requests/received")
+          setReceivedRequests(receivedRes.data.friendRequests)
+          const sentRes = await api.get("/api/friends/requests/sent")
+          setSentRequests(sentRes.data.friendRequests)
+        } catch (err) {
+          console.error("Error fetching requests in UserList", err)
+        }
       }
     } catch (error) {
       console.error("[v0] Fetch data error:", error)
@@ -133,10 +163,11 @@ export default function UserList({ selectedChat, onSelectChat, socket, onOpenPro
     setActionLoading({ ...actionLoading, [userId]: 'friend' })
     try {
       await api.post("/api/friends/request", { receiverId: userId })
-
+      toast.success("Friend request sent successfully!")
       fetchData()
     } catch (error) {
-
+      const errorMsg = error.response?.data?.message || "Failed to send friend request"
+      toast.error(errorMsg)
     } finally {
       setActionLoading({ ...actionLoading, [userId]: null })
     }
@@ -300,28 +331,22 @@ export default function UserList({ selectedChat, onSelectChat, socket, onOpenPro
                             {isTyping ? (
                               <p className="text-xs text-indigo-600 italic">typing...</p>
                             ) : lastMessage ? (
-                              <p className="text-xs text-gray-500 truncate">
-                                {lastMessage.content.length > 25 
-                                  ? `${lastMessage.content.substring(0, 25)}...` 
-                                  : lastMessage.content}
-                              </p>
+                              <div className="text-xs text-gray-500 truncate flex items-center gap-1">
+                                {lastMessage.isDeletedForAll ? (
+                                  <>
+                                    <FontAwesomeIcon icon={faBan} className="opacity-70 text-[10px]" />
+                                    <span className="italic">Deleted</span>
+                                  </>
+                                ) : (
+                                  lastMessage.content.length > 25 
+                                    ? `${lastMessage.content.substring(0, 25)}...` 
+                                    : lastMessage.content
+                                )}
+                              </div>
                             ) : null}
                           </div>
                         </div>
 
-                        {/* Action buttons - Icons only */}
-                        <div className="flex items-center gap-1 ml-2 flex-shrink-0">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              onOpenProfile(otherUser._id, false)
-                            }}
-                            className="p-1.5 text-gray-400 hover:text-gray-600"
-                            title="Profile"
-                          >
-                            <FontAwesomeIcon icon={faEllipsisV} className="text-xs" />
-                          </button>
-                        </div>
                       </div>
                     </div>
                   )
@@ -386,7 +411,13 @@ export default function UserList({ selectedChat, onSelectChat, socket, onOpenPro
                             <FontAwesomeIcon icon={faMessage} className="text-xs" />
                           </button>
                           <button
-                            onClick={() => {}}
+                            onClick={() => {
+                              if (!isOnline) {
+                                alert("Video call can't be done, user is offline")
+                                return
+                              }
+                              window.dispatchEvent(new CustomEvent("start-video-call-with-user", { detail: { userId: friend._id } }))
+                            }}
                             className="p-1.5 bg-green-100 hover:bg-green-200 text-green-600 rounded-lg"
                             title="Video Call"
                           >
@@ -400,6 +431,9 @@ export default function UserList({ selectedChat, onSelectChat, socket, onOpenPro
 
                 {activeTab === "users" && filteredData.map((user) => {
                   const isLoading = actionLoading[user._id]
+                  const isFriend = friends.some((f) => String(f._id) === String(user._id))
+                  const isSentPending = sentRequests.some((r) => r.receiver && String(r.receiver._id) === String(user._id))
+                  const isReceivedPending = receivedRequests.some((r) => r.sender && String(r.sender._id) === String(user._id))
 
                   return (
                     <div 
@@ -428,33 +462,45 @@ export default function UserList({ selectedChat, onSelectChat, socket, onOpenPro
                               <h3 className="font-medium text-gray-800 truncate text-sm">
                                 {user.username}
                               </h3>
-                              <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">
-                                User
+                              <span className={`text-xs px-1.5 py-0.5 rounded ${
+                                isFriend 
+                                  ? 'text-green-600 bg-green-100' 
+                                  : (isSentPending || isReceivedPending)
+                                    ? 'text-yellow-600 bg-yellow-100'
+                                    : 'text-gray-400 bg-gray-100'
+                              }`}>
+                                {isFriend ? 'Friend' : (isSentPending || isReceivedPending) ? 'Pending' : 'User'}
                               </span>
                             </div>
-                            <p className="text-xs text-gray-500 truncate">
-                              {user.email}
-                            </p>
                           </div>
                         </div>
 
                         {/* Action buttons - Icons only */}
                         <div className="flex items-center gap-1 ml-2 flex-shrink-0">
-                          <button
-                            onClick={() => handleSendFriendRequest(user._id)}
-                            disabled={isLoading}
-                            className="p-1.5 bg-indigo-100 hover:bg-indigo-200 text-indigo-600 rounded-lg disabled:opacity-50"
-                            title="Add Friend"
-                          >
-                            <FontAwesomeIcon icon={faUserPlus} className="text-xs" />
-                          </button>
-                          <button
-                            onClick={() => onOpenProfile(user._id, false)}
-                            className="p-1.5 text-gray-400 hover:text-gray-600"
-                            title="Profile"
-                          >
-                            <FontAwesomeIcon icon={faEllipsisV} className="text-xs" />
-                          </button>
+                          {isFriend ? (
+                            <button
+                              className="p-1.5 bg-green-100 text-green-600 rounded-lg cursor-default"
+                              title="Already Friend"
+                            >
+                              <FontAwesomeIcon icon={faUserFriends} className="text-xs" />
+                            </button>
+                          ) : (isSentPending || isReceivedPending) ? (
+                            <button
+                              className="p-1.5 bg-yellow-100 text-yellow-600 rounded-lg cursor-default"
+                              title="Pending Request"
+                            >
+                              <FontAwesomeIcon icon={faUserClock} className="text-xs" />
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleSendFriendRequest(user._id)}
+                              disabled={isLoading}
+                              className="p-1.5 bg-indigo-100 hover:bg-indigo-200 text-indigo-600 rounded-lg disabled:opacity-50"
+                              title="Add Friend"
+                            >
+                              <FontAwesomeIcon icon={faUserPlus} className="text-xs" />
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>

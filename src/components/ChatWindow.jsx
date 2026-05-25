@@ -4,12 +4,15 @@ import { useState, useEffect, useRef } from "react"
 import api from "../utils/api"
 
 import EmojiPicker from "emoji-picker-react"
+import { toast } from "react-toastify"
 import VideoCall from "./VideoCall"
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome"
 import {
   faArrowLeft,
   faVideo,
   faSmile,
+  faCopy,
+  faCheckSquare,
   faPaperclip,
   faPaperPlane,
   faTrash,
@@ -35,7 +38,8 @@ import {
   faMicrophone,
   faCamera,
   faExpand,
-  faCompress
+  faCompress,
+  faFolder
 } from "@fortawesome/free-solid-svg-icons"
 
 export default function ChatWindow({
@@ -48,10 +52,13 @@ export default function ChatWindow({
   setGlobalIncomingCall,
   setShowGlobalCallScreen,
   onBack,
+  onShowMedia,
+  onVideoCallStateChange,
 }) {
   const [messages, setMessages] = useState([])
   const [newMessage, setNewMessage] = useState("")
   const [loading, setLoading] = useState(false)
+
   const [isTyping, setIsTyping] = useState(false)
   const [typingUser, setTypingUser] = useState(null)
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
@@ -61,18 +68,33 @@ export default function ChatWindow({
   const [selectedFile, setSelectedFile] = useState(null)
   const [deleteMenuPosition, setDeleteMenuPosition] = useState("down")
   const [showDeleteMenu, setShowDeleteMenu] = useState(null)
+  const [isSelectionMode, setIsSelectionMode] = useState(false)
+  const [selectedMessages, setSelectedMessages] = useState([])
+  const [showHeaderMenu, setShowHeaderMenu] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [showClearChatConfirm, setShowClearChatConfirm] = useState(false)
+  const [showReactionDetails, setShowReactionDetails] = useState(null)
+  const [reactionDetailsPosition, setReactionDetailsPosition] = useState(null)
   const [isVideoCallMode, setIsVideoCallMode] = useState(false)
   const [incomingVideoCall, setIncomingVideoCall] = useState(null)
   const [otherUserOnline, setOtherUserOnline] = useState(false)
   const [emojiPickerPosition, setEmojiPickerPosition] = useState({ top: 0, left: 0 })
   const [pickerDimensions, setPickerDimensions] = useState({ width: 300, height: 400 })
   const [isCallFullScreen, setIsCallFullScreen] = useState(false)
+
+  useEffect(() => {
+    if (onVideoCallStateChange) {
+      onVideoCallStateChange(isVideoCallMode)
+    }
+  }, [isVideoCallMode, onVideoCallStateChange])
   const messagesEndRef = useRef(null)
+  const prevMessagesLengthRef = useRef(0)
   const messageRefs = useRef({})
   const typingTimeoutRef = useRef(null)
   const emojiPickerRef = useRef(null)
   const fileInputRef = useRef(null)
   const deleteMenuRef = useRef(null)
+  const headerMenuRef = useRef(null)
   const inputRef = useRef(null)
   const currentUser = JSON.parse(sessionStorage.getItem("user"))
 
@@ -84,19 +106,21 @@ export default function ChatWindow({
       joinChat()
     }
 
-    return () => {
-      if (socket && chat) {
-        socket.off("receive-message")
-        socket.off("message-seen-update")
-        socket.off("message-delivered-update")
-        socket.off("user-typing")
-        socket.off("user-stop-typing")
-        socket.off("message-reaction-update")
-        socket.off("message-deleted")
-        socket.off("video-call-reject")
+    const handleStartVideoCallEvent = (e) => {
+      if (e.detail.chatId === chat?._id) {
+        // Only start if user is online, though UserList might have checked already
+        if (otherUserOnline) {
+          setIncomingVideoCall(null)
+          setIsVideoCallMode(true)
+        }
       }
     }
-  }, [chat])
+    window.addEventListener("start-video-call", handleStartVideoCallEvent)
+
+    return () => {
+      window.removeEventListener("start-video-call", handleStartVideoCallEvent)
+    }
+  }, [chat, otherUserOnline])
 
   useEffect(() => {
     if (socket && chat) {
@@ -182,17 +206,12 @@ export default function ChatWindow({
       socket.on("message-deleted", (data) => {
         if (data.chatId === chat._id) {
           if (data.isDeletedForAll) {
-            setMessages((prev) => prev.filter((msg) => msg._id !== data.messageId))
-          } else {
             setMessages((prev) =>
               prev.map((msg) =>
                 msg._id === data.messageId
-                  ? {
-                      ...msg,
-                      deletedBy: [...(msg.deletedBy || []), { user: data.userId }],
-                    }
-                  : msg,
-              ),
+                  ? { ...msg, isDeletedForAll: true }
+                  : msg
+              )
             )
           }
         }
@@ -275,6 +294,18 @@ export default function ChatWindow({
           if (setGlobalIncomingCall) setGlobalIncomingCall(null)
           if (setShowGlobalCallScreen) setShowGlobalCallScreen(false)
         }
+        
+        // Ensure both users see the call log message instantly
+        const isForThisChat = (String(data.callerId) === String(otherUser._id) && String(data.receiverId) === String(currentUser.id)) ||
+                              (String(data.callerId) === String(currentUser.id) && String(data.receiverId) === String(otherUser._id));
+                              
+        if (isForThisChat) {
+          setTimeout(() => {
+            api.get(`/api/chats/${chat._id}/messages`)
+              .then(res => setMessages(res.data.messages))
+              .catch(err => console.error("Silent fetch error:", err))
+          }, 500); // Small delay to allow the backend to save the call log message
+        }
       })
 
       return () => {
@@ -330,6 +361,9 @@ export default function ChatWindow({
       if (deleteMenuRef.current && !deleteMenuRef.current.contains(event.target)) {
         setShowDeleteMenu(null)
       }
+      if (headerMenuRef.current && !headerMenuRef.current.contains(event.target)) {
+        setShowHeaderMenu(false)
+      }
     }
 
     document.addEventListener("mousedown", handleClickOutside)
@@ -337,7 +371,10 @@ export default function ChatWindow({
   }, [])
 
   useEffect(() => {
-    scrollToBottom()
+    if (messages.length > prevMessagesLengthRef.current) {
+      scrollToBottom()
+    }
+    prevMessagesLengthRef.current = messages.length
   }, [messages])
 
   useEffect(() => {
@@ -447,6 +484,10 @@ export default function ChatWindow({
       setNewMessage("")
       setShowEmojiPicker(false)
       stopTyping()
+      if (inputRef.current) {
+        inputRef.current.style.height = 'auto'
+        inputRef.current.style.overflowY = 'hidden'
+      }
     } catch (error) {
       console.error("Send message error:", error)
 
@@ -518,7 +559,13 @@ export default function ChatWindow({
       })
 
       if (deleteType === "everyone") {
-        setMessages((prev) => prev.filter((msg) => msg._id !== messageId))
+        setMessages((prev) => 
+          prev.map((msg) => 
+            msg._id === messageId 
+              ? { ...msg, isDeletedForAll: true }
+              : msg
+          )
+        )
       } else {
         setMessages((prev) =>
           prev.filter((msg) => {
@@ -536,6 +583,7 @@ export default function ChatWindow({
           messageId,
           userId: currentUser.id,
           isDeletedForAll: deleteType === "everyone",
+          recipientId: otherUser._id,
         })
       }
 
@@ -659,7 +707,7 @@ export default function ChatWindow({
 
   const handleStartVideoCall = () => {
     if (!otherUserOnline) {
-
+      alert("Video call can't be done, user is offline")
       return
     }
     
@@ -831,12 +879,109 @@ export default function ChatWindow({
     }
   }
 
+  const handleShowReactionDetails = (messageId, event) => {
+    const windowWidth = window.innerWidth
+    const isMobile = windowWidth < 768
+    if (isMobile) {
+      setReactionDetailsPosition(null)
+    } else {
+      const buttonRect = event.currentTarget.getBoundingClientRect()
+      const spaceBelow = window.innerHeight - buttonRect.bottom
+      const cardHeight = 250 // estimate
+      let stylePosition = {}
+      if (spaceBelow < cardHeight) {
+        stylePosition.bottom = window.innerHeight - buttonRect.top + 5
+      } else {
+        stylePosition.top = buttonRect.bottom + 5
+      }
+      let left = buttonRect.left
+      const cardWidth = 256 // w-64 is 16rem = 256px
+      if (left + cardWidth > windowWidth - 10) {
+        left = windowWidth - cardWidth - 10
+      }
+      stylePosition.left = left
+      setReactionDetailsPosition(stylePosition)
+    }
+    setShowReactionDetails(messageId)
+  }
+
   const handleToggleFullScreen = () => {
     setIsCallFullScreen(!isCallFullScreen)
   }
 
   // Identify the last few messages to open menu upwards
   const lastMessageIds = new Set(messages.slice(-4).map(m => m._id))
+
+  const handleToggleSelectionMode = () => {
+    setIsSelectionMode(!isSelectionMode)
+    setSelectedMessages([])
+    setShowHeaderMenu(false)
+  }
+
+  const handleSelectMessage = (messageId) => {
+    setSelectedMessages(prev => {
+      if (prev.includes(messageId)) {
+        return prev.filter(id => id !== messageId)
+      }
+      return [...prev, messageId]
+    })
+  }
+
+  const handleCopySelected = () => {
+    const selectedTexts = messages
+      .filter(m => selectedMessages.includes(m._id) && m.content && m.type !== "call")
+      .map(m => m.content)
+      .join('\n')
+    if (selectedTexts) {
+      navigator.clipboard.writeText(selectedTexts)
+    }
+    setIsSelectionMode(false)
+    setSelectedMessages([])
+  }
+
+  const handleDeleteSelected = async () => {
+    try {
+      for (const msgId of selectedMessages) {
+        await handleDeleteMessage(msgId, "me")
+      }
+    } catch (e) {
+      console.error(e)
+    }
+    setSelectedMessages([])
+  }
+
+  const handleClearChat = async () => {
+    try {
+      await api.delete(`/api/chats/${chat._id}/clear`)
+      setMessages([])
+      setShowClearChatConfirm(false)
+      setShowHeaderMenu(false)
+    } catch (error) {
+      console.error("Clear chat error:", error)
+    }
+  }
+
+  const handleDownloadSelected = () => {
+    messages
+      .filter(m => selectedMessages.includes(m._id) && m.attachments && m.attachments.length > 0)
+      .forEach(m => {
+        m.attachments.forEach(attachment => {
+          const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000"
+          const downloadUrl = `${API_URL}${attachment.fileUrl}`
+          const iframe = document.createElement('iframe')
+          iframe.style.display = 'none'
+          iframe.src = downloadUrl
+          document.body.appendChild(iframe)
+          setTimeout(() => document.body.removeChild(iframe), 10000)
+        })
+      })
+    setIsSelectionMode(false)
+    setSelectedMessages([])
+  }
+
+  const selectedMessageObjects = selectedMessages.map(id => messages.find(msg => msg._id === id)).filter(Boolean)
+  const hasDownloadable = selectedMessages.length > 0 && selectedMessageObjects.every(m => m.attachments && m.attachments.length > 0)
+  const hasText = selectedMessages.length > 0 && selectedMessageObjects.every(m => (!m.attachments || m.attachments.length === 0) && m.type !== "call" && m.content && m.content.trim().length > 0)
 
   return (
     <div className="flex flex-col h-full bg-white relative">
@@ -859,7 +1004,43 @@ export default function ChatWindow({
       )}
 
       {/* Chat Header */}
-      <div className={`bg-gray-50 px-4 py-3 flex items-center justify-between border-b border-gray-200 flex-shrink-0 ${isVideoCallMode && !isCallFullScreen ? 'opacity-50' : ''}`}>
+      {isSelectionMode ? (
+        <div className={`bg-[#202c33] h-[65px] text-white px-4 py-3 flex items-center justify-between border-b border-gray-700 flex-shrink-0 ${isVideoCallMode && !isCallFullScreen ? 'opacity-50' : ''}`}>
+          <div className="flex items-center gap-4">
+            <button onClick={() => { setIsSelectionMode(false); setSelectedMessages([]); }} className="text-gray-300 hover:text-white transition">
+              <FontAwesomeIcon icon={faTimes} className="text-xl" />
+            </button>
+            <span className="font-semibold">{selectedMessages.length} selected</span>
+          </div>
+          <div className="flex items-center gap-5">
+            <button 
+              onClick={handleCopySelected}
+              disabled={!hasText}
+              className={`${hasText ? 'text-gray-300 hover:text-white' : 'text-gray-600 cursor-not-allowed'} transition`}
+              title="Copy"
+            >
+              <FontAwesomeIcon icon={faCopy} className="text-lg" />
+            </button>
+            <button 
+              onClick={() => selectedMessages.length > 0 && setShowDeleteConfirm(true)}
+              disabled={selectedMessages.length === 0}
+              className={`${selectedMessages.length > 0 ? 'text-gray-300 hover:text-white' : 'text-gray-600 cursor-not-allowed'} transition`}
+              title="Delete"
+            >
+              <FontAwesomeIcon icon={faTrash} className="text-lg" />
+            </button>
+            <button 
+              onClick={handleDownloadSelected}
+              disabled={!hasDownloadable}
+              className={`${hasDownloadable ? 'text-gray-300 hover:text-white' : 'text-gray-600 cursor-not-allowed'} transition`}
+              title="Download"
+            >
+              <FontAwesomeIcon icon={faDownload} className="text-lg" />
+            </button>
+          </div>
+        </div>
+      ) : (
+      <div className={`bg-gray-50 h-[65px] px-4 py-3 flex items-center justify-between border-b border-gray-200 flex-shrink-0 ${isVideoCallMode && !isCallFullScreen ? 'opacity-50' : ''}`}>
         <div className="flex items-center gap-3">
           <button
             onClick={onBack}
@@ -868,21 +1049,23 @@ export default function ChatWindow({
             <FontAwesomeIcon icon={faArrowLeft} className="text-lg" />
           </button>
           
-          <div 
-            className="flex items-center gap-3 cursor-pointer"
-            onClick={() => onOpenProfile(otherUser._id, false)}
-          >
-            {otherUser.profileImage ? (
-              <img
-                src={otherUser.profileImage || "/placeholder.svg"}
-                alt="Profile"
-                className="w-10 h-10 rounded-full object-cover border border-gray-300"
-              />
-            ) : (
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold">
-                {otherUser.username[0].toUpperCase()}
-              </div>
-            )}
+          <div className="flex items-center gap-3">
+            <div 
+              className="cursor-pointer hover:opacity-85 transition flex-shrink-0"
+              onClick={() => onOpenProfile(otherUser._id, false)}
+            >
+              {otherUser.profileImage ? (
+                <img
+                  src={otherUser.profileImage || "/placeholder.svg"}
+                  alt="Profile"
+                  className="w-10 h-10 rounded-full object-cover border border-gray-300"
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold">
+                  {otherUser.username[0].toUpperCase()}
+                </div>
+              )}
+            </div>
             
             <div className="min-w-0">
               <h3 className="font-semibold text-gray-800 text-base">{otherUser.username}</h3>
@@ -904,6 +1087,13 @@ export default function ChatWindow({
 
         <div className="flex items-center gap-4">
           <button
+            onClick={onShowMedia}
+            className="text-gray-600 hover:text-gray-800 transition"
+            title="Shared Media"
+          >
+            <FontAwesomeIcon icon={faFolder} className="text-xl" />
+          </button>
+          <button
             onClick={handleStartVideoCall}
             className={`text-gray-600 hover:text-gray-800 transition ${!otherUserOnline ? "opacity-50 cursor-not-allowed" : ""}`}
             title={otherUserOnline ? "Video call" : "User is offline"}
@@ -911,11 +1101,45 @@ export default function ChatWindow({
           >
             <FontAwesomeIcon icon={faVideo} className="text-xl" />
           </button>
-          <button className="text-gray-600 hover:text-gray-800 transition">
-            <FontAwesomeIcon icon={faEllipsisV} className="text-xl" />
-          </button>
+          <div className="relative" ref={headerMenuRef}>
+            <button 
+              onClick={() => setShowHeaderMenu(!showHeaderMenu)}
+              className="text-gray-600 hover:text-gray-800 transition p-1"
+            >
+              <FontAwesomeIcon icon={faEllipsisV} className="text-xl" />
+            </button>
+            {showHeaderMenu && (
+              <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 w-48 py-1 overflow-hidden">
+                <button 
+                  onClick={handleToggleSelectionMode}
+                  className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3"
+                >
+                  <FontAwesomeIcon icon={faCheckSquare} className="text-gray-400 w-4" />
+                  <span>Select messages</span>
+                </button>
+                <button 
+                  onClick={onBack}
+                  className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3"
+                >
+                  <FontAwesomeIcon icon={faTimes} className="text-gray-400 w-4" />
+                  <span>Close chat</span>
+                </button>
+                <button 
+                  onClick={() => {
+                    setShowHeaderMenu(false);
+                    setShowClearChatConfirm(true);
+                  }}
+                  className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-3"
+                >
+                  <FontAwesomeIcon icon={faTrashAlt} className="text-red-400 w-4" />
+                  <span>Delete chat</span>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
+      )}
 
       <div 
         className={`flex-1 overflow-y-auto bg-[#e5ddd5] p-2 sm:p-4 ${isVideoCallMode && !isCallFullScreen ? 'opacity-30 pointer-events-none' : ''}`}
@@ -965,11 +1189,29 @@ export default function ChatWindow({
                     <div
                       key={message._id}
                       ref={(el) => (messageRefs.current[message._id] = el)}
-                      className={`flex mb-3 ${isOwn ? "justify-end" : "justify-start"} group relative`}
-                      style={{ zIndex: showDeleteMenu === message._id ? 50 : 'auto' }}
+                      onClick={(e) => {
+                        if (isSelectionMode && !isSystem) {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleSelectMessage(message._id);
+                        }
+                      }}
+                      className={`flex items-start ${!isCallMessage && message.reactions && message.reactions.length > 0 ? "mb-8" : "mb-3"} group relative ${isSelectionMode && !isSystem ? 'cursor-pointer hover:bg-black/5 rounded-lg px-2 -mx-2 transition-colors' : ''}`}
+                      style={{ zIndex: showDeleteMenu === message._id ? 50 : 'auto', backgroundColor: selectedMessages.includes(message._id) ? 'rgba(0,0,0,0.1)' : '' }}
                       onMouseLeave={() => setShowDeleteMenu(null)}
                     >
-                      <div className={`max-w-[70%] md:max-w-[60%]`}>
+                      {/* Checkbox strictly on the left */}
+                      {isSelectionMode && !isSystem && (
+                        <div className="flex-shrink-0 mr-4 w-6 flex items-center justify-center pt-2">
+                          <div className={`w-5 h-5 rounded border flex items-center justify-center ${selectedMessages.includes(message._id) ? 'bg-[#00a884] border-[#00a884]' : 'border-gray-400 bg-white'}`}>
+                            {selectedMessages.includes(message._id) && <FontAwesomeIcon icon={faCheck} className="text-white text-xs" />}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Message Bubble Container */}
+                      <div className={`flex flex-1 ${isOwn ? "justify-end" : "justify-start"}`}>
+                        <div className={`max-w-[70%] md:max-w-[60%]`}>
                         <div className="relative">
                           {/* Message bubble */}
                           <div
@@ -990,81 +1232,74 @@ export default function ChatWindow({
                                     </p>
                                 </div>
                               </div>
-                            ) : message.content && (
-                              <div className="flex flex-col relative min-w-[80px]">
-                                <p className="text-sm leading-relaxed break-words whitespace-pre-wrap pr-2 pb-1">
-                                  {message.content}
-                                </p>
-                                <div className="flex items-center justify-end gap-1.5 self-end -mt-1 ml-4 select-none">
-                                  <span className="text-[10px] text-gray-500 min-w-fit">
-                                    {new Date(message.createdAt).toLocaleTimeString([], {
-                                      hour: "2-digit",
-                                      minute: "2-digit",
-                                    })}
-                                  </span>
-                                  {messageStatus && (
-                                    <FontAwesomeIcon 
-                                      icon={messageStatus.icon} 
-                                      className={`text-[10px] ${messageStatus.color}`}
-                                      title={messageStatus.label}
-                                    />
-                                  )}
-                                </div>
+                            ) : message.isDeletedForAll ? (
+                              <div className="flex items-center gap-2 py-1 text-gray-500 italic">
+                                <FontAwesomeIcon icon={faBan} className="text-sm opacity-70" />
+                                <span className="text-sm">
+                                  {isOwn ? "You deleted this message" : "This message was deleted"}
+                                </span>
                               </div>
-                            )}
-
-                            {message.attachments && message.attachments.length > 0 && (
-                              <div className="mt-2 space-y-2">
-                                {message.attachments.map((attachment, idx) => {
-                                  const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000"
-                                  const downloadUrl = `${API_URL}${attachment.fileUrl}`
-
-                                  return (
-                                    <a
-                                      key={idx}
-                                      href={downloadUrl}
-                                      download={attachment.fileName}
-                                      className="flex items-center gap-3 bg-black/5 hover:bg-black/10 p-3 rounded-xl transition-all cursor-pointer border border-transparent hover:border-black/5"
-                                      target="_blank"
-                                      rel="noreferrer"
-                                    >
-                                      <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-sm text-xl">
-                                        <FontAwesomeIcon 
-                                          icon={getFileIcon(attachment.fileType)} 
-                                          className={`${getFileIconColor(attachment.fileType)}`}
-                                        />
-                                      </div>
-                                      <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-semibold text-gray-800 truncate">
-                                          {attachment.fileName}
-                                        </p>
-                                        <p className="text-[10px] text-gray-500 uppercase font-medium tracking-wide">
-                                          {(attachment.fileSize / (1024 * 1024)).toFixed(2)} MB • {attachment.fileType.split('/')[1] || 'FILE'}
-                                        </p>
-                                      </div>
-                                      <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center shadow-sm text-gray-500">
-                                        <FontAwesomeIcon icon={faDownload} className="text-xs" />
-                                      </div>
-                                    </a>
-                                  )
-                                })}
-                                {/* Time check for attachments only if no text content */}
-                                {!message.content && (
-                                    <div className="flex justify-end items-center gap-1 mt-1">
-                                      <span className="text-[10px] text-gray-500">
-                                        {new Date(message.createdAt).toLocaleTimeString([], {
-                                          hour: "2-digit",
-                                          minute: "2-digit",
-                                        })}
-                                      </span>
-                                      {messageStatus && (
-                                        <FontAwesomeIcon 
-                                          icon={messageStatus.icon} 
-                                          className={`text-[10px] ${messageStatus.color}`}
-                                          title={messageStatus.label}
-                                        />
-                                      )}
-                                    </div>
+                            ) : (
+                              <div className="flex flex-col relative min-w-[80px]">
+                                {message.attachments && message.attachments.length > 0 && (
+                                  <div className="space-y-2 mb-1">
+                                    {message.attachments.map((attachment, idx) => {
+                                      const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000"
+                                      const downloadUrl = `${API_URL}${attachment.fileUrl}`
+                                      return (
+                                        <a
+                                          key={idx}
+                                          href={downloadUrl}
+                                          download={attachment.fileName}
+                                          className="flex items-center gap-3 bg-black/5 hover:bg-black/10 p-3 rounded-xl transition-all cursor-pointer border border-transparent hover:border-black/5"
+                                          target="_blank"
+                                          rel="noreferrer"
+                                        >
+                                          <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-sm text-xl">
+                                            <FontAwesomeIcon 
+                                              icon={getFileIcon(attachment.fileType)} 
+                                              className={`${getFileIconColor(attachment.fileType)}`}
+                                            />
+                                          </div>
+                                          <div className="flex-1 min-w-0">
+                                            <p className="text-sm font-semibold text-gray-800 truncate">
+                                              {attachment.fileName}
+                                            </p>
+                                            <p className="text-[10px] text-gray-500 uppercase font-medium tracking-wide">
+                                              {(attachment.fileSize / (1024 * 1024)).toFixed(2)} MB • {attachment.fileType.split('/')[1] || 'FILE'}
+                                            </p>
+                                          </div>
+                                          <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center shadow-sm text-gray-500">
+                                            <FontAwesomeIcon icon={faDownload} className="text-xs" />
+                                          </div>
+                                        </a>
+                                      )
+                                    })}
+                                  </div>
+                                )}
+                                
+                                {message.content && (
+                                  <p className="text-sm leading-relaxed break-words whitespace-pre-wrap pr-2 pb-1">
+                                    {message.content}
+                                  </p>
+                                )}
+                                
+                                {(message.content || (message.attachments && message.attachments.length > 0)) && (
+                                  <div className="flex items-center justify-end gap-1.5 self-end -mt-1 ml-4 select-none">
+                                    <span className="text-[10px] text-gray-500 min-w-fit">
+                                      {new Date(message.createdAt).toLocaleTimeString([], {
+                                        hour: "2-digit",
+                                        minute: "2-digit",
+                                      })}
+                                    </span>
+                                    {messageStatus && (
+                                      <FontAwesomeIcon 
+                                        icon={messageStatus.icon} 
+                                        className={`text-[10px] ${messageStatus.color}`}
+                                        title={messageStatus.label}
+                                      />
+                                    )}
+                                  </div>
                                 )}
                               </div>
                             )}
@@ -1072,7 +1307,7 @@ export default function ChatWindow({
 
                           {/* Reactions */}
                           {!isCallMessage && message.reactions && message.reactions.length > 0 && (
-                            <div className={`absolute -bottom-3 ${isOwn ? 'right-0' : 'left-0'} z-10`}>
+                            <div className={`absolute -bottom-5 ${isOwn ? 'right-0' : 'left-0'} z-10`}>
                                 <div className="bg-white rounded-full shadow pl-1 pr-2 py-0.5 flex items-center gap-1 border border-gray-100">
                                   {Array.from(
                                     message.reactions.reduce((acc, r) => {
@@ -1082,7 +1317,7 @@ export default function ChatWindow({
                                   ).map(([emoji, count]) => (
                                     <button
                                       key={emoji}
-                                      onClick={() => handleReaction(message._id, emoji)}
+                                      onClick={(e) => handleShowReactionDetails(message._id, e)}
                                       className="flex items-center hover:bg-gray-100 rounded-full px-1 transition-colors"
                                     >
                                       <span className="text-sm">{emoji}</span>
@@ -1094,7 +1329,7 @@ export default function ChatWindow({
                           )}
 
                           {/* Message actions (Menu) */}
-                          {!isCallMessage && (
+                          {!isCallMessage && !isSelectionMode && (
                           <div
                             className={`absolute top-1/2 -translate-y-1/2 ${isOwn 
                               ? "left-0 -translate-x-full pr-2" 
@@ -1131,6 +1366,7 @@ export default function ChatWindow({
 
                                 {showDeleteMenu === message._id && (
                                   <div
+                                    onMouseDown={(e) => e.stopPropagation()}
                                     className={`absolute ${deleteMenuPosition === 'up' ? 'bottom-full mb-1' : 'top-full mt-1'} 
                                       ${isOwn 
                                         ? 'right-0 origin-top-right md:right-0 md:left-auto md:origin-top-right' 
@@ -1138,6 +1374,7 @@ export default function ChatWindow({
                                       } 
                                       bg-white border border-gray-100 rounded-lg shadow-xl z-50 overflow-hidden py-1 ring-1 ring-black/5 mx-0
                                       w-32 md:w-48
+                                      ${/* On mobile, shift if needed to stay on screen, but simpler to just align inwards */ ''}
                                       ${/* On mobile, shift if needed to stay on screen, but simpler to just align inwards */ ''}
                                       ${!isOwn ? 'right-0 left-auto origin-top-right md:left-0 md:right-auto md:origin-top-left' : ''}
                                       ${isOwn ? 'left-0 right-auto origin-top-left md:right-0 md:left-auto md:origin-top-right' : ''}
@@ -1148,7 +1385,11 @@ export default function ChatWindow({
                                     }}
                                   >
                                     <button
-                                      onClick={() => handleDeleteMessage(message._id, "me")}
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        handleDeleteMessage(message._id, "me")
+                                      }}
+                                      onMouseDown={(e) => e.stopPropagation()}
                                       className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
                                     >
                                       <FontAwesomeIcon icon={faTrashAlt} className="text-gray-400" />
@@ -1156,7 +1397,11 @@ export default function ChatWindow({
                                     </button>
                                     {isOwn && (
                                       <button
-                                        onClick={() => handleDeleteMessage(message._id, "everyone")}
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          handleDeleteMessage(message._id, "everyone")
+                                        }}
+                                        onMouseDown={(e) => e.stopPropagation()}
                                         className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
                                       >
                                         <FontAwesomeIcon icon={faBan} className="text-red-500" />
@@ -1170,6 +1415,7 @@ export default function ChatWindow({
                           </div>
                           )}
                         </div>
+                      </div>
                       </div>
                     </div>
                   )
@@ -1202,6 +1448,118 @@ export default function ChatWindow({
             searchDisabled
             skinTonesDisabled
           />
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50" onClick={() => setShowDeleteConfirm(false)}>
+          <div className="bg-white rounded-xl p-6 shadow-xl w-80 max-w-[90%]" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-gray-800 mb-2">Delete Messages</h3>
+            <p className="text-gray-600 mb-6 text-sm">Are you sure you want to delete the selected {selectedMessages.length} message{selectedMessages.length > 1 ? 's' : ''}? This action cannot be undone.</p>
+            <div className="flex justify-end gap-3">
+              <button 
+                onClick={() => setShowDeleteConfirm(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={() => {
+                  setShowDeleteConfirm(false);
+                  handleDeleteSelected();
+                }}
+                className="px-4 py-2 text-sm font-medium bg-red-500 text-white hover:bg-red-600 rounded-lg transition"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Clear Chat Confirmation Modal */}
+      {showClearChatConfirm && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50" onClick={() => setShowClearChatConfirm(false)}>
+          <div className="bg-white rounded-xl p-6 shadow-xl w-80 max-w-[90%]" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-gray-800 mb-2">Clear Chat History</h3>
+            <p className="text-gray-600 mb-6 text-sm">Are you sure entire chat history will be deleted? This action cannot be undone and will only delete messages for you.</p>
+            <div className="flex justify-end gap-3">
+              <button 
+                onClick={() => setShowClearChatConfirm(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleClearChat}
+                className="px-4 py-2 text-sm font-medium bg-red-500 text-white hover:bg-red-600 rounded-lg transition"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reaction Details Modal */}
+      {showReactionDetails && (
+        <div 
+          className="fixed inset-0 z-[110]" 
+          onClick={() => setShowReactionDetails(null)}
+        >
+          {/* Background overlay for mobile */}
+          {!reactionDetailsPosition && <div className="absolute inset-0 bg-black/20" />}
+          
+          <div 
+            className={`bg-white rounded-xl shadow-[0_0_15px_rgba(0,0,0,0.1)] w-64 max-w-sm overflow-hidden border border-gray-100 ${
+              reactionDetailsPosition 
+                ? 'absolute' 
+                : 'absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2'
+            }`}
+            onClick={e => e.stopPropagation()}
+            style={reactionDetailsPosition ? reactionDetailsPosition : {}}
+          >
+            <div className="px-4 py-3 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+              <h3 className="font-semibold text-gray-800 text-sm">Reactions</h3>
+              <button onClick={() => setShowReactionDetails(null)} className="text-gray-400 hover:text-gray-600">
+                <FontAwesomeIcon icon={faTimes} />
+              </button>
+            </div>
+            <div className="max-h-60 overflow-y-auto">
+              {messages.find(m => m._id === showReactionDetails)?.reactions?.map((reaction, idx) => (
+                <div key={idx} className="flex items-center justify-between px-4 py-2 hover:bg-gray-50">
+                  <div className="flex items-center gap-3">
+                    {reaction.user?.profileImage ? (
+                      <img src={reaction.user.profileImage} alt="" className="w-8 h-8 rounded-full object-cover" />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-medium text-sm">
+                        {reaction.user?.username?.[0]?.toUpperCase()}
+                      </div>
+                    )}
+                    <span className="text-sm font-medium text-gray-700">
+                      {reaction.user?._id === currentUser.id ? 'You' : reaction.user?.username}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">{reaction.emoji}</span>
+                    {reaction.user?._id === currentUser.id && (
+                      <button 
+                        onClick={() => {
+                          handleReaction(showReactionDetails, reaction.emoji);
+                          setShowReactionDetails(null);
+                        }}
+                        className="text-gray-400 hover:text-red-500 transition-colors w-6 h-6 flex items-center justify-center rounded-full hover:bg-red-50"
+                        title="Remove reaction"
+                      >
+                         <FontAwesomeIcon icon={faTimes} className="text-xs" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
@@ -1281,15 +1639,38 @@ export default function ChatWindow({
             </button>
           </div>
 
-          <div className="flex-1 relative">
-            <input
+          <div className={`flex-1 relative bg-white border border-gray-300 rounded-2xl flex items-center pl-4 pr-2 py-1 ${selectedFile ? 'opacity-50' : 'focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500'}`}>
+            <textarea
               ref={inputRef}
-              type="text"
               value={newMessage}
               onChange={handleTyping}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  if (newMessage.trim()) {
+                    if (selectedFile) {
+                      handleSendFile();
+                    } else {
+                      const pseudoEvent = { preventDefault: () => {} };
+                      handleSendMessage(pseudoEvent);
+                    }
+                  }
+                }
+              }}
               placeholder="Type a message"
-              className="w-full px-4 py-3 bg-white border border-gray-300 rounded-full focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-gray-800 placeholder-gray-500 text-sm"
+              rows={1}
+              className="w-full py-2 bg-transparent focus:outline-none text-gray-800 placeholder-gray-500 text-sm resize-none min-h-[24px] max-h-[120px]"
               disabled={selectedFile !== null}
+              style={{
+                height: "auto",
+                overflowY: "hidden"
+              }}
+              onInput={(e) => {
+                e.target.style.height = 'auto';
+                const newHeight = Math.min(e.target.scrollHeight, 120);
+                e.target.style.height = newHeight + 'px';
+                e.target.style.overflowY = e.target.scrollHeight > 120 ? 'auto' : 'hidden';
+              }}
             />
           </div>
 

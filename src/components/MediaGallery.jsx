@@ -23,6 +23,14 @@ import {
   faChevronUp
 } from "@fortawesome/free-solid-svg-icons"
 
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000"
+
+const getFileUrl = (url) => {
+  if (!url) return "/placeholder.svg"
+  if (url.startsWith("http")) return url
+  return `${API_URL}${url}`
+}
+
 export default function MediaGallery({ chat, isOpen, onClose }) {
   const [media, setMedia] = useState([])
   const [filteredMedia, setFilteredMedia] = useState([])
@@ -320,7 +328,7 @@ export default function MediaGallery({ chat, isOpen, onClose }) {
                     {attachment.fileType.startsWith("image/") ? (
                       <div className="aspect-square relative">
                         <img
-                          src={attachment.fileUrl || "/placeholder.svg"}
+                          src={getFileUrl(attachment.fileUrl)}
                           alt={attachment.fileName}
                           className="w-full h-full object-cover cursor-pointer transition duration-300 group-hover:scale-105"
                           onClick={() => setSelectedFile(attachment)}
@@ -362,7 +370,7 @@ export default function MediaGallery({ chat, isOpen, onClose }) {
                     {/* Quick Action Button */}
                     <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
                       <a
-                        href={attachment.fileUrl}
+                        href={getFileUrl(attachment.fileUrl)}
                         download={attachment.fileName}
                         className="w-8 h-8 bg-white hover:bg-indigo-50 rounded-full flex items-center justify-center shadow-md transition"
                         title="Download"
@@ -401,15 +409,15 @@ export default function MediaGallery({ chat, isOpen, onClose }) {
         >
           <div className="relative max-w-full max-h-full" onClick={(e) => e.stopPropagation()}>
             <img
-              src={selectedFile.fileUrl || "/placeholder.svg"}
+              src={getFileUrl(selectedFile.fileUrl)}
               alt={selectedFile.fileName}
-              className="max-w-full max-h-[80vh] sm:max-h-[85vh] object-contain rounded-lg"
+              className="max-w-full max-h-[80vh] sm:max-h-[85vh] object-contain rounded-lg shadow-[0_0_20px_rgba(255,255,255,0.05)]"
             />
             
             {/* Controls */}
             <div className="absolute top-2 sm:top-4 right-2 sm:right-4 flex items-center gap-2">
               <a
-                href={selectedFile.fileUrl}
+                href={getFileUrl(selectedFile.fileUrl)}
                 download={selectedFile.fileName}
                 className="p-2 sm:p-3 bg-white hover:bg-gray-100 rounded-full shadow-lg transition flex items-center justify-center"
                 title="Download"

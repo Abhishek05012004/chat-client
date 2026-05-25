@@ -1,7 +1,7 @@
 import { io } from "socket.io-client"
 
-// Use your Render server URL
-const SOCKET_URL = "https://chat-server-5h9u.onrender.com"
+// Use environment variable with fallback for development/production
+const SOCKET_URL = import.meta.env.VITE_API_URL || "https://chat-server-5h9u.onrender.com"
 
 let socket = null
 let currentUserId = null

@@ -1132,7 +1132,7 @@ export default function VideoCall({
         {!isFullScreen && (
           <button
             onClick={onToggleFullScreen}
-            className="absolute top-3 right-3 md:top-4 md:right-4 z-10 bg-black/50 text-white p-2 md:p-3 rounded-full hover:bg-black/70 transition"
+            className="hidden xl:block absolute top-3 right-3 md:top-4 md:right-4 z-10 bg-black/50 text-white p-2 md:p-3 rounded-full hover:bg-black/70 transition"
             title="Expand to full screen"
           >
             <FontAwesomeIcon icon={faExpand} className="text-sm md:text-base" />
@@ -1142,7 +1142,7 @@ export default function VideoCall({
         {isFullScreen && (
           <button
             onClick={onToggleFullScreen}
-            className="absolute top-3 right-3 md:top-4 md:right-4 z-10 bg-black/50 text-white p-2 md:p-3 rounded-full hover:bg-black/70 transition"
+            className="hidden xl:block absolute top-3 right-3 md:top-4 md:right-4 z-10 bg-black/50 text-white p-2 md:p-3 rounded-full hover:bg-black/70 transition"
             title="Exit full screen"
           >
             <FontAwesomeIcon icon={faCompress} className="text-sm md:text-base" />
@@ -1161,7 +1161,7 @@ export default function VideoCall({
               : `absolute z-20 cursor-pointer transition-all duration-300 ease-in-out
                  ${isFullScreen 
                    ? 'bottom-6 right-6 w-32 h-42 md:w-40 md:h-52' 
-                   : 'bottom-3 right-3 w-20 h-26 sm:w-24 sm:h-32 md:w-28 md:h-36'
+                   : 'bottom-20 right-3 w-20 h-26 sm:w-24 sm:h-32 md:w-28 md:h-36'
                  } 
                  bg-black border-2 md:border-3 border-gray-800 rounded-lg md:rounded-xl overflow-hidden shadow-2xl` // PIP
           }
@@ -1252,7 +1252,7 @@ export default function VideoCall({
              : `absolute z-20 cursor-pointer transition-all duration-300 ease-in-out
                 ${isFullScreen 
                   ? 'bottom-6 right-6 w-32 h-42 md:w-40 md:h-52' 
-                  : 'bottom-3 right-3 w-20 h-26 sm:w-24 sm:h-32 md:w-28 md:h-36'
+                  : 'bottom-20 right-3 w-20 h-26 sm:w-24 sm:h-32 md:w-28 md:h-36'
                 } 
                 bg-black border-2 md:border-3 border-gray-800 rounded-lg md:rounded-xl overflow-hidden shadow-2xl` // PIP (Default)
           }
