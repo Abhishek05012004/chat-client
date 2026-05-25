@@ -1421,7 +1421,7 @@ export default function ChatWindow({
                                       <FontAwesomeIcon icon={faTrashAlt} className="text-gray-400" />
                                       Delete for me
                                     </button>
-                                    {isOwn && (
+                                    {isOwn && !message.isDeletedForAll && (
                                       <button
                                         onClick={(e) => {
                                           e.stopPropagation()

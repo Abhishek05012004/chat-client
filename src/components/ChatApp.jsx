@@ -420,26 +420,18 @@ export default function ChatApp() {
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center bg-gradient-to-br from-gray-50 to-white p-4">
             <div className="text-center max-w-md px-4">
-              <div className="relative mb-6">
-                <div className="w-24 h-24 mx-auto bg-gradient-to-r from-indigo-500/20 to-purple-500/20 rounded-full flex items-center justify-center">
-                  <FontAwesomeIcon
-                    icon={faComments}
-                    className="text-4xl sm:text-5xl text-indigo-600"
-                  />
-                </div>
-                <div className="absolute -top-2 -right-2 w-10 h-10 bg-gradient-to-r from-green-400 to-emerald-500 rounded-full flex items-center justify-center shadow-lg">
-                  <FontAwesomeIcon icon={faVideo} className="text-white text-sm" />
-                </div>
+              <div className="flex justify-center mb-1">
+                <img src="/logo.png" alt="Logo" className="w-56 h-56 object-contain rounded-2xl" />
               </div>
               
-              <h2 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-3">
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-1">
                 Welcome
               </h2>
-              <p className="text-gray-600 text-sm sm:text-base mb-6">
+              <p className="text-gray-600 text-sm sm:text-base mb-4">
                 Select a friend from the sidebar to start messaging and make video calls.
               </p>
               
-              <div className="grid grid-cols-2 gap-3 mb-6">
+              <div className="grid grid-cols-2 gap-3 mb-4">
                 <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
                   <FontAwesomeIcon icon={faComments} className="text-indigo-600 text-lg mb-2" />
                   <h3 className="font-semibold text-gray-800 text-sm">Real-time Chat</h3>

@@ -137,12 +137,10 @@ export default function Register() {
       <div className="w-full max-w-md">
         <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
           {/* Header with different background - matches login theme */}
-          <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border-b border-gray-200 p-6 md:p-8">
+          <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border-b border-gray-200 py-2 px-6">
             <div className="flex flex-col items-center text-center">
-              <div className="inline-flex items-center justify-center w-14 h-14 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-xl shadow-md mb-4">
-                <i className="fas fa-user-plus text-white text-xl md:text-2xl"></i>
-              </div>
-              <h1 className="text-xl md:text-2xl font-bold text-gray-800 mb-2">Create Account</h1>
+              <img src="/logo.png" alt="Logo" className="w-24 h-24 object-contain mb-1 rounded-xl" />
+              <h1 className="text-xl md:text-2xl font-bold text-gray-800 mb-1">Create Account</h1>
               <p className="text-gray-600 text-sm md:text-base">Join our chat community</p>
             </div>
 
