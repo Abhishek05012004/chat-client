@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useNavigate, Link } from "react-router-dom"
+import { toast } from "react-toastify"
 
 import api from "../utils/api"
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome"
@@ -12,13 +13,15 @@ import {
   faArrowLeft,
   faSpinner,
   faCheckCircle,
-  faRedoAlt
+  faRedoAlt,
+  faExclamationCircle
 } from "@fortawesome/free-solid-svg-icons"
 
 export default function ForgotPassword() {
   const navigate = useNavigate()
   const [step, setStep] = useState(1)
   const [userId, setUserId] = useState("")
+  const [error, setError] = useState("")
   const [formData, setFormData] = useState({
     identifier: "",
     otp: "",
@@ -31,11 +34,15 @@ export default function ForgotPassword() {
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
+    if (error) {
+      setError("")
+    }
   }
 
   // Step 1: Request OTP
   const handleRequestOTP = async (e) => {
     e.preventDefault()
+    setError("")
     setLoading(true)
 
     try {
@@ -44,9 +51,11 @@ export default function ForgotPassword() {
       })
       setUserId(response.data.userId)
       setStep(2)
-
-    } catch (error) {
-
+      toast.success("OTP has been sent to your registered email.")
+    } catch (err) {
+      const errorMsg = err.response?.data?.message || err.response?.data?.error || "Failed to request OTP. Please try again."
+      setError(errorMsg)
+      toast.error(errorMsg)
     } finally {
       setLoading(false)
     }
@@ -55,6 +64,7 @@ export default function ForgotPassword() {
   // Step 2: Verify OTP
   const handleVerifyOTP = async (e) => {
     e.preventDefault()
+    setError("")
     setLoading(true)
 
     try {
@@ -63,9 +73,11 @@ export default function ForgotPassword() {
         otp: formData.otp,
       })
       setStep(3)
-
-    } catch (error) {
-
+      toast.success("OTP verified successfully!")
+    } catch (err) {
+      const errorMsg = err.response?.data?.message || "Incorrect OTP. Please try again."
+      setError(errorMsg)
+      toast.error(errorMsg)
     } finally {
       setLoading(false)
     }
@@ -74,14 +86,17 @@ export default function ForgotPassword() {
   // Step 3: Reset Password
   const handleResetPassword = async (e) => {
     e.preventDefault()
+    setError("")
 
     if (formData.password !== formData.confirmPassword) {
-
+      setError("Passwords do not match")
+      toast.error("Passwords do not match")
       return
     }
 
     if (formData.password.length < 6) {
-
+      setError("Password must be at least 6 characters")
+      toast.error("Password must be at least 6 characters")
       return
     }
 
@@ -93,21 +108,27 @@ export default function ForgotPassword() {
         password: formData.password,
       })
 
+      toast.success("Password reset successful! Redirecting to login...")
       setTimeout(() => navigate("/login"), 2000)
-    } catch (error) {
-
+    } catch (err) {
+      const errorMsg = err.response?.data?.message || "Failed to reset password."
+      setError(errorMsg)
+      toast.error(errorMsg)
     } finally {
       setLoading(false)
     }
   }
 
   const handleResendOTP = async () => {
+    setError("")
     setLoading(true)
     try {
       await api.post("/api/auth/resend-forgot-otp", { userId })
-
-    } catch (error) {
-
+      toast.success("OTP resent successfully!")
+    } catch (err) {
+      const errorMsg = err.response?.data?.message || "Failed to resend OTP. Please try again."
+      setError(errorMsg)
+      toast.error(errorMsg)
     } finally {
       setLoading(false)
     }
@@ -183,6 +204,14 @@ export default function ForgotPassword() {
 
           {/* Form Section */}
           <div className="p-6 md:p-8">
+            {error && (
+              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3 animate-fade-in text-left">
+                <div className="flex-shrink-0 w-5 h-5 bg-red-100 rounded-full flex items-center justify-center mt-0.5">
+                  <FontAwesomeIcon icon={faExclamationCircle} className="text-red-600 text-xs" />
+                </div>
+                <p className="text-red-700 text-sm font-medium flex-1">{error}</p>
+              </div>
+            )}
             {/* Step 1: Request OTP */}
             {step === 1 && (
               <form onSubmit={handleRequestOTP} className="space-y-5">
@@ -427,6 +456,16 @@ export default function ForgotPassword() {
           </div>
         </div>
       </div>
+      {/* Add these styles for animations */}
+      <style jsx>{`
+        @keyframes fade-in {
+          from { opacity: 0; transform: translateY(-10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in {
+          animation: fade-in 0.3s ease-out;
+        }
+      `}</style>
     </div>
   )
 }

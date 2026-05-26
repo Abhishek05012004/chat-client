@@ -47,7 +47,7 @@ export default function Register() {
       setStep(2)
       toast.success("Registration initiated! OTP has been sent.")
     } catch (err) {
-      const errorMsg = err.response?.data?.message || "Registration failed. Please check your details."
+      const errorMsg = err.response?.data?.message || err.response?.data?.error || "Registration failed. Please check your details."
       setError(errorMsg)
       toast.error(errorMsg)
     } finally {
@@ -89,7 +89,7 @@ export default function Register() {
       await api.post("/api/auth/resend-otp", { userId })
       toast.success("OTP resent successfully!")
     } catch (err) {
-      const errorMsg = err.response?.data?.message || "Failed to resend OTP. Please try again."
+      const errorMsg = err.response?.data?.message || err.response?.data?.error || "Failed to resend OTP. Please try again."
       setError(errorMsg)
       toast.error(errorMsg)
     } finally {
