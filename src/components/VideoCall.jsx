@@ -49,6 +49,18 @@ export default function VideoCall({
   const [facingMode, setFacingMode] = useState("user")
   const [hasMultipleCameras, setHasMultipleCameras] = useState(false)
 
+  // Check for multiple cameras helper
+  const checkCameras = async () => {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices()
+      const videoDevices = devices.filter(device => device.kind === 'videoinput')
+      setHasMultipleCameras(videoDevices.length > 1)
+      console.log("[VideoCall] Video devices found:", videoDevices.length)
+    } catch (error) {
+      console.error("[VideoCall] Error enumerating devices:", error)
+    }
+  }
+
   const localVideoRef = useRef(null)
   const remoteVideoRef = useRef(null)
   const localStreamRef = useRef(null)
@@ -92,6 +104,12 @@ export default function VideoCall({
   // Cleanup all resources
   const cleanupCall = () => {
     console.log("[VideoCall] Cleaning up call resources")
+    
+    // Pop the dummy history state if we pushed it
+    if (window.history.state && window.history.state.inCall) {
+      console.log("[VideoCall] Popping dummy history state")
+      window.history.back()
+    }
     
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach((track) => {
@@ -171,6 +189,9 @@ export default function VideoCall({
       
       // Store the stream reference
       localStreamRef.current = stream
+      
+      // Re-check cameras now that permissions are definitely granted
+      checkCameras()
       
       // Update the local video element
       if (localVideoRef.current) {
@@ -288,9 +309,9 @@ export default function VideoCall({
           callStateRef.current = CALL_STATES.CONNECTED
 
         } else if (state === "failed" || state === "disconnected") {
-          console.log("[VideoCall] Connection failed/disconnected")
+          console.log("[VideoCall] Connection failed/disconnected, ending call")
           if (callStateRef.current !== CALL_STATES.IDLE) {
-
+            endCall()
           }
         } else if (state === "closed") {
           console.log("[VideoCall] Connection closed")
@@ -305,8 +326,10 @@ export default function VideoCall({
         if (state === "connected" || state === "completed") {
           console.log("[VideoCall] ICE connection successful")
         } else if (state === "failed") {
-          console.log("[VideoCall] ICE connection failed")
-
+          console.log("[VideoCall] ICE connection failed, ending call")
+          if (callStateRef.current !== CALL_STATES.IDLE) {
+            endCall()
+          }
         } else if (state === "disconnected") {
           console.log("[VideoCall] ICE disconnected")
         }
@@ -499,19 +522,28 @@ export default function VideoCall({
     callDurationRef.current = callDuration
   }, [callDuration])
 
-  // Check for multiple cameras
+  // Handle mobile/physical back button interception
   useEffect(() => {
-    const checkCameras = async () => {
-      try {
-        const devices = await navigator.mediaDevices.enumerateDevices()
-        const videoDevices = devices.filter(device => device.kind === 'videoinput')
-        setHasMultipleCameras(videoDevices.length > 1)
-        console.log("[VideoCall] Video devices found:", videoDevices.length)
-      } catch (error) {
-        console.error("[VideoCall] Error enumerating devices:", error)
+    const handlePopState = (event) => {
+      if (callStateRef.current !== CALL_STATES.IDLE) {
+        console.log("[VideoCall] Physical/Browser Back button pressed during call. Ending call.")
+        endCall()
       }
     }
-    
+
+    if (callState !== CALL_STATES.IDLE) {
+      console.log("[VideoCall] Call is active. Pushing state to history for back button interception.")
+      window.history.pushState({ inCall: true }, "")
+      window.addEventListener("popstate", handlePopState)
+    }
+
+    return () => {
+      window.removeEventListener("popstate", handlePopState)
+    }
+  }, [callState])
+
+  // Check for multiple cameras
+  useEffect(() => {
     checkCameras()
     
     // Listen for device changes
@@ -625,32 +657,35 @@ export default function VideoCall({
       const newFacingMode = facingMode === "user" ? "environment" : "user"
       console.log("[VideoCall] Switching camera to:", newFacingMode)
       
+      // Stop old video tracks FIRST to release camera hardware on mobile devices
+      if (localStreamRef.current) {
+        const oldVideoTracks = localStreamRef.current.getVideoTracks()
+        oldVideoTracks.forEach(track => {
+          track.stop()
+          localStreamRef.current.removeTrack(track)
+        })
+      }
+      
       // Get new video stream
       const newStream = await navigator.mediaDevices.getUserMedia({
         video: {
           width: { ideal: 640, max: 1280 },
           height: { ideal: 480, max: 720 },
           frameRate: { ideal: 24, max: 30 },
-          facingMode: newFacingMode
+          facingMode: { ideal: newFacingMode }
         }
       })
       
       const newVideoTrack = newStream.getVideoTracks()[0]
       
-      if (localStreamRef.current) {
-        // Stop old video track
-        const oldVideoTrack = localStreamRef.current.getVideoTracks()[0]
-        if (oldVideoTrack) {
-          oldVideoTrack.stop()
-          localStreamRef.current.removeTrack(oldVideoTrack)
-        }
-        
+      if (localStreamRef.current && newVideoTrack) {
         // Add new track to local stream
         localStreamRef.current.addTrack(newVideoTrack)
         
         // Update local video element
         if (localVideoRef.current) {
           localVideoRef.current.srcObject = localStreamRef.current
+          localVideoRef.current.play().catch(e => console.error("[VideoCall] Play error after switch:", e))
         }
         
         // Replace track in peer connection
@@ -671,6 +706,29 @@ export default function VideoCall({
       }
     } catch (error) {
       console.error("[VideoCall] Error switching camera:", error)
+      // Fallback: try to restore the original facing mode if it failed
+      try {
+        const fallbackStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: facingMode } }
+        })
+        const fallbackTrack = fallbackStream.getVideoTracks()[0]
+        if (localStreamRef.current && fallbackTrack) {
+          localStreamRef.current.addTrack(fallbackTrack)
+          if (localVideoRef.current) {
+            localVideoRef.current.srcObject = localStreamRef.current
+            localVideoRef.current.play().catch(e => console.error(e))
+          }
+          if (peerConnectionRef.current) {
+            const senders = peerConnectionRef.current.getSenders()
+            const videoSender = senders.find(s => s.track?.kind === "video")
+            if (videoSender) {
+              await videoSender.replaceTrack(fallbackTrack)
+            }
+          }
+        }
+      } catch (fallbackError) {
+        console.error("[VideoCall] Fallback camera restore failed:", fallbackError)
+      }
     }
   }
 
@@ -1031,6 +1089,16 @@ export default function VideoCall({
     }
   }, [hasRemoteStream])
 
+  // Ensure remote video plays when video is enabled
+  useEffect(() => {
+    if (remoteVideoEnabled && remoteVideoRef.current && remoteVideoRef.current.paused) {
+      console.log("[VideoCall] Remote video re-enabled, playing stream")
+      remoteVideoRef.current.play().catch(error => {
+        console.error("[VideoCall] Error auto-playing remote video on re-enable:", error)
+      })
+    }
+  }, [remoteVideoEnabled])
+
   // Ensure local video is always updated when stream is available
   useEffect(() => {
     if (localStreamRef.current && localVideoRef.current) {
@@ -1170,6 +1238,7 @@ export default function VideoCall({
                 ref={remoteVideoRef}
                 autoPlay
                 playsInline
+                muted={!remoteAudioEnabled}
                 className="w-full h-full object-cover"
                 onLoadedMetadata={() => {
                   console.log("[VideoCall] Remote video metadata loaded")
