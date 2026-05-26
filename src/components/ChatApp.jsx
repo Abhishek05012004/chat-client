@@ -1,5 +1,3 @@
-"use client";
-
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { initializeSocket, disconnectSocket } from "../utils/socket";
