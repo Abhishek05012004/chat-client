@@ -25,7 +25,8 @@ import {
   faComment,
   faVideo,
   faEllipsisH,
-  faExternalLinkAlt
+  faExternalLinkAlt,
+  faTrash
 } from "@fortawesome/free-solid-svg-icons"
 
 export default function ProfileModal({ isOpen, onClose, userId, isOwnProfile }) {
@@ -244,6 +245,22 @@ export default function ProfileModal({ isOpen, onClose, userId, isOwnProfile }) 
                         disabled={uploadingImage}
                       />
                     </label>
+                  )}
+
+                  {/* Remove Photo Button */}
+                  {isOwnProfile && editing && imagePreview && imagePreview !== "" && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setImagePreview("")
+                        setImageError(false)
+                      }}
+                      className="absolute bottom-0 left-0 bg-gradient-to-r from-red-500 to-rose-600 text-white p-2 sm:p-3 rounded-full cursor-pointer hover:from-red-600 hover:to-rose-700 transition shadow-lg flex items-center justify-center"
+                      title="Remove Profile Image"
+                      style={{ width: "38px", height: "38px" }}
+                    >
+                      <FontAwesomeIcon icon={faTrash} className="text-xs sm:text-sm" />
+                    </button>
                   )}
                 </div>
 

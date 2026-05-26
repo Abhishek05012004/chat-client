@@ -29,6 +29,7 @@ export default function ForgotPassword() {
     confirmPassword: "",
   })
   const [loading, setLoading] = useState(false)
+  const [resendLoading, setResendLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
@@ -124,7 +125,7 @@ export default function ForgotPassword() {
 
   const handleResendOTP = async () => {
     setError("")
-    setLoading(true)
+    setResendLoading(true)
     try {
       await api.post("/api/auth/resend-forgot-otp", { userId })
       toast.success("OTP resent successfully!")
@@ -134,7 +135,7 @@ export default function ForgotPassword() {
       setError(errorMsg)
       toast.error(errorMsg)
     } finally {
-      setLoading(false)
+      setResendLoading(false)
     }
   }
 
@@ -323,11 +324,20 @@ export default function ForgotPassword() {
                   <button
                     type="button"
                     onClick={handleResendOTP}
-                    disabled={loading}
-                    className="text-indigo-600 hover:text-indigo-700 font-medium text-sm transition-colors inline-flex items-center gap-1"
+                    disabled={resendLoading}
+                    className="text-indigo-600 hover:text-indigo-700 font-medium text-sm transition-colors inline-flex items-center gap-1 disabled:opacity-50"
                   >
-                    <FontAwesomeIcon icon={faRedoAlt} />
-                    <span>Resend OTP</span>
+                    {resendLoading ? (
+                      <>
+                        <FontAwesomeIcon icon={faSpinner} className="fa-spin" />
+                        <span>Resending...</span>
+                      </>
+                    ) : (
+                      <>
+                        <FontAwesomeIcon icon={faRedoAlt} />
+                        <span>Resend OTP</span>
+                      </>
+                    )}
                   </button>
                   <p className="text-gray-500 text-xs mt-2">Didn't receive the code? Wait 60 seconds before resending</p>
                 </div>
