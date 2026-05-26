@@ -1,3 +1,5 @@
+"use client"
+
 import { useState } from "react"
 import { useNavigate, Link } from "react-router-dom"
 import { toast } from "react-toastify"
@@ -23,7 +25,12 @@ export default function Register() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value })
+    if (e.target.name === "phoneNumber") {
+      const val = e.target.value.replace(/\D/g, "").slice(0, 10)
+      setFormData({ ...formData, phoneNumber: val })
+    } else {
+      setFormData({ ...formData, [e.target.name]: e.target.value })
+    }
     if (error) {
       setError("")
     }
@@ -32,6 +39,15 @@ export default function Register() {
   const handleRegister = async (e) => {
     e.preventDefault()
     setError("")
+
+    const phoneRegex = /^\d{10}$/
+    if (!phoneRegex.test(formData.phoneNumber)) {
+      const errorMsg = "Phone number must be exactly 10 digits."
+      setError(errorMsg)
+      toast.error(errorMsg)
+      return
+    }
+
     setLoading(true)
 
     try {
