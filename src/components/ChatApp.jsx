@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { initializeSocket, disconnectSocket } from "../utils/socket";
+import api from "../utils/api";
 import UserList from "./UserList";
 import ChatWindow from "./ChatWindow";
 import FriendRequests from "./FriendRequests";
@@ -40,6 +41,17 @@ export default function ChatApp() {
 
   useEffect(() => {
     if (user) {
+      // Fetch initial unread count
+      const fetchUnreadCount = async () => {
+        try {
+          const response = await api.get("/api/friends/requests/unread-count");
+          setUnreadRequests(response.data.unreadCount || 0);
+        } catch (err) {
+          console.error("Error fetching unread count:", err);
+        }
+      };
+      fetchUnreadCount();
+
       const socketInstance = initializeSocket(user.id);
       setSocket(socketInstance);
       window.socketInstance = socketInstance;
