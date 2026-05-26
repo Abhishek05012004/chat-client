@@ -47,7 +47,8 @@ export default function Register() {
       setStep(2)
       toast.success("Registration initiated! OTP has been sent.")
     } catch (err) {
-      const errorMsg = err.response?.data?.message || err.response?.data?.error || "Registration failed. Please check your details."
+      const details = err.response?.data?.error ? ` (${err.response.data.error})` : "";
+      const errorMsg = err.response?.data?.message ? `${err.response.data.message}${details}` : "Registration failed. Please check your details.";
       setError(errorMsg)
       toast.error(errorMsg)
     } finally {
@@ -69,7 +70,8 @@ export default function Register() {
       setStep(3)
       toast.success("OTP verified successfully!")
     } catch (err) {
-      const errorMsg = err.response?.data?.message || "Incorrect OTP. Please try again."
+      const details = err.response?.data?.error ? ` (${err.response.data.error})` : "";
+      const errorMsg = err.response?.data?.message ? `${err.response.data.message}${details}` : "Incorrect OTP. Please try again.";
       setError(errorMsg)
       toast.error(errorMsg)
     } finally {
@@ -89,7 +91,8 @@ export default function Register() {
       await api.post("/api/auth/resend-otp", { userId })
       toast.success("OTP resent successfully!")
     } catch (err) {
-      const errorMsg = err.response?.data?.message || err.response?.data?.error || "Failed to resend OTP. Please try again."
+      const details = err.response?.data?.error ? ` (${err.response.data.error})` : "";
+      const errorMsg = err.response?.data?.message ? `${err.response.data.message}${details}` : "Failed to resend OTP. Please try again.";
       setError(errorMsg)
       toast.error(errorMsg)
     } finally {
@@ -124,7 +127,8 @@ export default function Register() {
       toast.success("Password set successfully! Redirecting to login...")
       setTimeout(() => navigate("/login"), 2000)
     } catch (err) {
-      const errorMsg = err.response?.data?.message || "Failed to set password."
+      const details = err.response?.data?.error ? ` (${err.response.data.error})` : "";
+      const errorMsg = err.response?.data?.message ? `${err.response.data.message}${details}` : "Failed to set password.";
       setError(errorMsg)
       toast.error(errorMsg)
     } finally {

@@ -53,7 +53,8 @@ export default function ForgotPassword() {
       setStep(2)
       toast.success("OTP has been sent to your registered email.")
     } catch (err) {
-      const errorMsg = err.response?.data?.message || err.response?.data?.error || "Failed to request OTP. Please try again."
+      const details = err.response?.data?.error ? ` (${err.response.data.error})` : "";
+      const errorMsg = err.response?.data?.message ? `${err.response.data.message}${details}` : "Failed to request OTP. Please try again.";
       setError(errorMsg)
       toast.error(errorMsg)
     } finally {
@@ -75,7 +76,8 @@ export default function ForgotPassword() {
       setStep(3)
       toast.success("OTP verified successfully!")
     } catch (err) {
-      const errorMsg = err.response?.data?.message || "Incorrect OTP. Please try again."
+      const details = err.response?.data?.error ? ` (${err.response.data.error})` : "";
+      const errorMsg = err.response?.data?.message ? `${err.response.data.message}${details}` : "Incorrect OTP. Please try again.";
       setError(errorMsg)
       toast.error(errorMsg)
     } finally {
@@ -111,7 +113,8 @@ export default function ForgotPassword() {
       toast.success("Password reset successful! Redirecting to login...")
       setTimeout(() => navigate("/login"), 2000)
     } catch (err) {
-      const errorMsg = err.response?.data?.message || "Failed to reset password."
+      const details = err.response?.data?.error ? ` (${err.response.data.error})` : "";
+      const errorMsg = err.response?.data?.message ? `${err.response.data.message}${details}` : "Failed to reset password.";
       setError(errorMsg)
       toast.error(errorMsg)
     } finally {
@@ -126,7 +129,8 @@ export default function ForgotPassword() {
       await api.post("/api/auth/resend-forgot-otp", { userId })
       toast.success("OTP resent successfully!")
     } catch (err) {
-      const errorMsg = err.response?.data?.message || "Failed to resend OTP. Please try again."
+      const details = err.response?.data?.error ? ` (${err.response.data.error})` : "";
+      const errorMsg = err.response?.data?.message ? `${err.response.data.message}${details}` : "Failed to resend OTP. Please try again.";
       setError(errorMsg)
       toast.error(errorMsg)
     } finally {
